@@ -28,7 +28,7 @@ describe('Command Queue #slow', function () {
       Aerospike.connect()
         .then(client => {
           let cmds = Array.from({ length: 10 }, (_, i) =>
-            client.put(new Aerospike.Key('test', 'test', i), {i: i}))
+            client.put(new Aerospike.Key('test', 'test', i), { i: i }))
           Promise.all(cmds)
             .then(results => done(results.length))
             .then(() => client.close())
@@ -44,7 +44,7 @@ describe('Command Queue #slow', function () {
       Aerospike.connect()
         .then(client => {
           let cmds = Array.from({ length: 10 }, (_, i) =>
-            client.put(new Aerospike.Key('test', 'test', i), {i: i}))
+            client.put(new Aerospike.Key('test', 'test', i), { i: i }))
           Promise.all(cmds)
             .then(() => done('All commands processed successfully'))
             .catch(error => done(error.message))

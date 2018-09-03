@@ -34,16 +34,16 @@ context('Operations', function () {
   let key = null
 
   beforeEach(() => {
-    key = keygen.string(helper.namespace, helper.set, {prefix: 'test/operate'})()
+    key = keygen.string(helper.namespace, helper.set, { prefix: 'test/operate' })()
     let bins = {
       string: 'abc',
       int: 123,
       double1: 1.23,
       double2: new Double(1.0),
-      geo: new GeoJSON({type: 'Point', coordinates: [103.913, 1.308]}),
+      geo: new GeoJSON({ type: 'Point', coordinates: [103.913, 1.308] }),
       blob: Buffer.from('foo'),
       list: [1, 2, 3],
-      map: {a: 1, b: 2, c: 3}
+      map: { a: 1, b: 2, c: 3 }
     }
     let policy = new Aerospike.WritePolicy({
       exists: Aerospike.policy.exists.CREATE_OR_REPLACE
@@ -62,10 +62,10 @@ context('Operations', function () {
           op.write('int', 432),
           op.write('double1', 2.34),
           op.write('double2', new Double(2.0)),
-          op.write('geo', new GeoJSON({type: 'Point', coordinates: [123.456, 1.308]})),
+          op.write('geo', new GeoJSON({ type: 'Point', coordinates: [123.456, 1.308] })),
           op.write('blob', Buffer.from('bar')),
           op.write('list', [2, 3, 4]),
-          op.write('map', {d: 4, e: 5, f: 6})
+          op.write('map', { d: 4, e: 5, f: 6 })
         ]
 
         return client.operate(key, ops)
@@ -80,7 +80,7 @@ context('Operations', function () {
             )
             expect(record.bins['blob'].equals(Buffer.from('bar'))).to.be.ok()
             expect(record.bins['list']).to.eql([2, 3, 4])
-            expect(record.bins['map']).to.eql({d: 4, e: 5, f: 6})
+            expect(record.bins['map']).to.eql({ d: 4, e: 5, f: 6 })
           })
       })
 
@@ -209,9 +209,9 @@ context('Operations', function () {
         //   clocks are not synchronous between server and client, the ttl client calculates may not
         //   be accurate to the user. Nevertheless server expires the record in the correct time.
 
-        let key = keygen.string(helper.namespace, helper.set, {prefix: 'test/operate/ttl'})()
-        let bins = {i: 123, s: 'abc'}
-        let meta = {ttl: 1000}
+        let key = keygen.string(helper.namespace, helper.set, { prefix: 'test/operate/ttl' })()
+        let bins = { i: 123, s: 'abc' }
+        let meta = { ttl: 1000 }
 
         client.put(key, bins, meta, function (err) {
           if (err) throw err
@@ -247,7 +247,7 @@ context('Operations', function () {
     context('exists policy', function () {
       context('policy.exists.UPDATE', function () {
         it('does not create a key that does not exist yet', function () {
-          let notExistentKey = keygen.string(helper.namespace, helper.set, {prefix: 'test/operate/doesNotExist'})()
+          let notExistentKey = keygen.string(helper.namespace, helper.set, { prefix: 'test/operate/doesNotExist' })()
           let ops = [op.write('i', 49)]
           let policy = new Aerospike.policy.OperatePolicy({
             exists: Aerospike.policy.exists.UPDATE
@@ -294,7 +294,7 @@ context('Operations', function () {
 
   describe('Client#add', function () {
     it('acts as a shortcut for the add operation', function () {
-      return client.add(key, {int: 234})
+      return client.add(key, { int: 234 })
         .then(() => client.get(key))
         .then(record => {
           expect(record.bins['int']).to.equal(357)
@@ -304,7 +304,7 @@ context('Operations', function () {
 
   describe('Client#incr', function () {
     it('acts as a shortcut for the add operation', function () {
-      return client.incr(key, {int: 234})
+      return client.incr(key, { int: 234 })
         .then(() => client.get(key))
         .then(record => {
           expect(record.bins['int']).to.equal(357)
@@ -314,7 +314,7 @@ context('Operations', function () {
 
   describe('Client#append', function () {
     it('acts as a shortcut for the append operation', function () {
-      return client.append(key, {string: 'def'})
+      return client.append(key, { string: 'def' })
         .then(() => client.get(key))
         .then(record => {
           expect(record.bins['string']).to.equal('abcdef')
@@ -324,7 +324,7 @@ context('Operations', function () {
 
   describe('Client#prepend', function () {
     it('acts as a shortcut for the prepend operation', function () {
-      return client.prepend(key, {string: 'def'})
+      return client.prepend(key, { string: 'def' })
         .then(() => client.get(key))
         .then(record => {
           expect(record.bins['string']).to.equal('defabc')

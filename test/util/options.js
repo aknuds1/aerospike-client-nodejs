@@ -113,7 +113,7 @@ options.getConfig = function () {
     }
   }
   if (options.host !== null) {
-    config.hosts = [{addr: options.host, port: options.port || 3000}]
+    config.hosts = [{ addr: options.host, port: options.port || 3000 }]
   }
   if (options.user !== null) {
     config.user = options.user

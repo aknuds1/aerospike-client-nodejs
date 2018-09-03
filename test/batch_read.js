@@ -34,19 +34,19 @@ describe('client.batchRead()', function () {
 
   before(function () {
     var nrecords = 10
-    var kgen = keygen.string(helper.namespace, helper.set, {prefix: 'test/batch_read/', random: false})
-    var mgen = metagen.constant({ttl: 1000})
-    var rgen = recgen.record({i: valgen.integer(), s: valgen.string()})
+    var kgen = keygen.string(helper.namespace, helper.set, { prefix: 'test/batch_read/', random: false })
+    var mgen = metagen.constant({ ttl: 1000 })
+    var rgen = recgen.record({ i: valgen.integer(), s: valgen.string() })
     return putgen.put(nrecords, kgen, rgen, mgen)
   })
 
   it('returns the status whether each key was found or not', function (done) {
     let batchRecords = [
-      {key: new Key(helper.namespace, helper.set, 'test/batch_read/1')},
-      {key: new Key(helper.namespace, helper.set, 'test/batch_read/3')},
-      {key: new Key(helper.namespace, helper.set, 'test/batch_read/5')},
-      {key: new Key(helper.namespace, helper.set, 'test/batch_read/no_such_key')},
-      {key: new Key(helper.namespace, helper.set, 'test/batch_read/not_either')}
+      { key: new Key(helper.namespace, helper.set, 'test/batch_read/1') },
+      { key: new Key(helper.namespace, helper.set, 'test/batch_read/3') },
+      { key: new Key(helper.namespace, helper.set, 'test/batch_read/5') },
+      { key: new Key(helper.namespace, helper.set, 'test/batch_read/no_such_key') },
+      { key: new Key(helper.namespace, helper.set, 'test/batch_read/not_either') }
     ]
 
     client.batchRead(batchRecords, function (err, results) {
@@ -64,9 +64,9 @@ describe('client.batchRead()', function () {
 
   it('returns only meta data if no bins are selected', function (done) {
     var batchRecords = [
-      {key: new Key(helper.namespace, helper.set, 'test/batch_read/1')},
-      {key: new Key(helper.namespace, helper.set, 'test/batch_read/3')},
-      {key: new Key(helper.namespace, helper.set, 'test/batch_read/5')}
+      { key: new Key(helper.namespace, helper.set, 'test/batch_read/1') },
+      { key: new Key(helper.namespace, helper.set, 'test/batch_read/3') },
+      { key: new Key(helper.namespace, helper.set, 'test/batch_read/5') }
     ]
 
     client.batchRead(batchRecords, function (err, results) {
@@ -82,9 +82,9 @@ describe('client.batchRead()', function () {
 
   it('returns just the selected bins', function (done) {
     var batchRecords = [
-      {key: new Key(helper.namespace, helper.set, 'test/batch_read/1'), bins: ['i']},
-      {key: new Key(helper.namespace, helper.set, 'test/batch_read/3'), bins: ['i']},
-      {key: new Key(helper.namespace, helper.set, 'test/batch_read/5'), bins: ['i']}
+      { key: new Key(helper.namespace, helper.set, 'test/batch_read/1'), bins: ['i'] },
+      { key: new Key(helper.namespace, helper.set, 'test/batch_read/3'), bins: ['i'] },
+      { key: new Key(helper.namespace, helper.set, 'test/batch_read/5'), bins: ['i'] }
     ]
 
     client.batchRead(batchRecords, function (err, results) {
@@ -102,9 +102,9 @@ describe('client.batchRead()', function () {
 
   it('returns the entire record', function (done) {
     var batchRecords = [
-      {key: new Key(helper.namespace, helper.set, 'test/batch_read/1'), read_all_bins: true},
-      {key: new Key(helper.namespace, helper.set, 'test/batch_read/3'), read_all_bins: true},
-      {key: new Key(helper.namespace, helper.set, 'test/batch_read/5'), read_all_bins: true}
+      { key: new Key(helper.namespace, helper.set, 'test/batch_read/1'), read_all_bins: true },
+      { key: new Key(helper.namespace, helper.set, 'test/batch_read/3'), read_all_bins: true },
+      { key: new Key(helper.namespace, helper.set, 'test/batch_read/5'), read_all_bins: true }
     ]
 
     client.batchRead(batchRecords, function (err, results) {
@@ -122,9 +122,9 @@ describe('client.batchRead()', function () {
 
   it('returns selected bins for each key', function (done) {
     var batchRecords = [
-      {key: new Key(helper.namespace, helper.set, 'test/batch_read/1'), read_all_bins: true},
-      {key: new Key(helper.namespace, helper.set, 'test/batch_read/3'), read_all_bins: false, bins: ['i']},
-      {key: new Key(helper.namespace, helper.set, 'test/batch_read/5'), read_all_bins: false}
+      { key: new Key(helper.namespace, helper.set, 'test/batch_read/1'), read_all_bins: true },
+      { key: new Key(helper.namespace, helper.set, 'test/batch_read/3'), read_all_bins: false, bins: ['i'] },
+      { key: new Key(helper.namespace, helper.set, 'test/batch_read/5'), read_all_bins: false }
     ]
 
     client.batchRead(batchRecords, function (err, results) {
@@ -152,7 +152,7 @@ describe('client.batchRead()', function () {
 
   it('returns a Promise that resolves to the batch results', function () {
     var batchRecords = [
-      {key: new Key(helper.namespace, helper.set, 'test/batch_read/1'), read_all_bins: true}
+      { key: new Key(helper.namespace, helper.set, 'test/batch_read/1'), read_all_bins: true }
     ]
 
     return client.batchRead(batchRecords)

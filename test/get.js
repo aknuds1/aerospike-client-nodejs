@@ -31,9 +31,9 @@ describe('client.get()', function () {
   var client = helper.client
 
   it('should read the record', function (done) {
-    var key = keygen.string(helper.namespace, helper.set, {prefix: 'test/get/'})()
-    var meta = metagen.constant({ttl: 1000})()
-    var record = recgen.constant({i: 123, s: 'abc'})()
+    var key = keygen.string(helper.namespace, helper.set, { prefix: 'test/get/' })()
+    var meta = metagen.constant({ ttl: 1000 })()
+    var record = recgen.constant({ i: 123, s: 'abc' })()
 
     client.put(key, record, meta, function (err) {
       if (err) throw err
@@ -48,7 +48,7 @@ describe('client.get()', function () {
   })
 
   it('should not find the record', function (done) {
-    var key = keygen.string(helper.namespace, helper.set, {prefix: 'test/not_found/'})()
+    var key = keygen.string(helper.namespace, helper.set, { prefix: 'test/not_found/' })()
 
     client.get(key, function (err, record) {
       expect(err.code).to.equal(status.ERR_RECORD_NOT_FOUND)
@@ -57,9 +57,9 @@ describe('client.get()', function () {
   })
 
   it('should read the record using a read policy', function () {
-    let key = keygen.string(helper.namespace, helper.set, {prefix: 'test/get/'})()
-    let meta = metagen.constant({ttl: 1000})()
-    let bins = recgen.constant({i: 123, s: 'abc'})()
+    let key = keygen.string(helper.namespace, helper.set, { prefix: 'test/get/' })()
+    let meta = metagen.constant({ ttl: 1000 })()
+    let bins = recgen.constant({ i: 123, s: 'abc' })()
     let policy = new Aerospike.ReadPolicy({
       totalTimeout: 1000,
       key: Aerospike.policy.key.SEND,
@@ -72,9 +72,9 @@ describe('client.get()', function () {
   })
 
   it('should return the TTL for a never expiring record as Aerospike.ttl.NEVER_EXPIRE', function (done) {
-    var key = keygen.string(helper.namespace, helper.set, {prefix: 'test/get/'})()
-    var meta = metagen.constant({ttl: Aerospike.ttl.NEVER_EXPIRE})()
-    var record = recgen.constant({i: 123, s: 'abc'})()
+    var key = keygen.string(helper.namespace, helper.set, { prefix: 'test/get/' })()
+    var meta = metagen.constant({ ttl: Aerospike.ttl.NEVER_EXPIRE })()
+    var record = recgen.constant({ i: 123, s: 'abc' })()
 
     client.put(key, record, meta, function (err) {
       if (err) throw err
@@ -90,7 +90,7 @@ describe('client.get()', function () {
   })
 
   it('should return a Promise that resolves to a Record', function () {
-    var key = keygen.string(helper.namespace, helper.set, {prefix: 'test/get/'})()
+    var key = keygen.string(helper.namespace, helper.set, { prefix: 'test/get/' })()
 
     return client.put(key, { i: 42 })
       .then(() => client.get(key))
@@ -100,7 +100,7 @@ describe('client.get()', function () {
 
   it('fetches a record given the digest', function () {
     let key = new Aerospike.Key('test', 'test', 'digestOnly')
-    client.put(key, {foo: 'bar'})
+    client.put(key, { foo: 'bar' })
       .then(() => {
         let digest = key.digest
         let key2 = new Aerospike.Key('test', null, null, digest)
