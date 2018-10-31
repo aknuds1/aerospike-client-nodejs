@@ -1,5 +1,5 @@
 {
-  "name": "aerospike",
+  "name": "@arve.knudsen/aerospike",
   "version": "3.7.2",
   "description": "Aerospike Client Library",
   "keywords": [
@@ -7,7 +7,7 @@
     "database",
     "nosql"
   ],
-  "homepage": "https://github.com/aerospike/aerospike-client-nodejs",
+  "homepage": "https://github.com/aknuds1/aerospike-client-nodejs",
   "license": "Apache-2.0",
   "main": "lib/aerospike",
   "engines": {
@@ -23,10 +23,10 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/aerospike/aerospike-client-nodejs"
+    "url": "https://github.com/aknuds1/aerospike-client-nodejs"
   },
   "bugs": {
-    "url": "https://github.com/aerospike/aerospike-client-nodejs/issues"
+    "url": "https://github.com/aknuds1/aerospike-client-nodejs/issues"
   },
   "scripts": {
     "test": "mocha",
