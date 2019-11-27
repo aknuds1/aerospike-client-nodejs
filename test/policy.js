@@ -1,5 +1,5 @@
 // *****************************************************************************
-// Copyright 2013-2018 Aerospike, Inc.
+// Copyright 2013-2019 Aerospike, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License")
 // you may not use this file except in compliance with the License.
@@ -27,7 +27,7 @@ context('Client Policies #noserver', function () {
   describe('BasePolicy', function () {
     describe('new BasePolicy', function () {
       it('sets totalTimeout to zero', function () {
-        let subject = new BasePolicy({
+        const subject = new BasePolicy({
           totalTimeout: 0
         })
 
@@ -39,7 +39,7 @@ context('Client Policies #noserver', function () {
   describe('ApplyPolicy', function () {
     describe('new ApplyPolicy', function () {
       it('sets the policy values from a value object', function () {
-        let subject = new Aerospike.ApplyPolicy({
+        const subject = new Aerospike.ApplyPolicy({
           socketTimeout: 1000,
           totalTimeout: 2000,
           maxRetries: 1,
@@ -65,7 +65,7 @@ context('Client Policies #noserver', function () {
   describe('WritePolicy', function () {
     describe('new WritePolicy', function () {
       it('sets the policy values from a value object', function () {
-        let subject = new Aerospike.WritePolicy({
+        const subject = new Aerospike.WritePolicy({
           socketTimeout: 1000,
           totalTimeout: 2000,
           maxRetries: 1,
@@ -93,13 +93,14 @@ context('Client Policies #noserver', function () {
   describe('ReadPolicy', function () {
     describe('new ReadPolicy', function () {
       it('sets the policy values from a value object', function () {
-        let subject = new Aerospike.ReadPolicy({
+        const subject = new Aerospike.ReadPolicy({
           socketTimeout: 1000,
           totalTimeout: 2000,
           maxRetries: 1,
           key: Aerospike.policy.key.SEND,
           replica: Aerospike.policy.replica.MASTER,
-          consistencyLevel: Aerospike.policy.consistencyLevel.ONE
+          readModeAP: Aerospike.policy.readModeAP.ONE,
+          readModeSC: Aerospike.policy.readModeSC.SESSION
         })
 
         expect(subject.socketTimeout).to.equal(1000)
@@ -107,7 +108,8 @@ context('Client Policies #noserver', function () {
         expect(subject.maxRetries).to.equal(1)
         expect(subject.key).to.equal(Aerospike.policy.key.SEND)
         expect(subject.replica).to.equal(Aerospike.policy.replica.MASTER)
-        expect(subject.consistencyLevel).to.equal(Aerospike.policy.consistencyLevel.ONE)
+        expect(subject.readModeAP).to.equal(Aerospike.policy.readModeAP.ONE)
+        expect(subject.readModeSC).to.equal(Aerospike.policy.readModeSC.SESSION)
       })
     })
   })
@@ -115,11 +117,12 @@ context('Client Policies #noserver', function () {
   describe('BatchPolicy', function () {
     describe('new BatchPolicy', function () {
       it('sets the policy values from a value object', function () {
-        let subject = new Aerospike.BatchPolicy({
+        const subject = new Aerospike.BatchPolicy({
           socketTimeout: 1000,
           totalTimeout: 2000,
           maxRetries: 1,
-          consistencyLevel: Aerospike.policy.consistencyLevel.ONE,
+          readModeAP: Aerospike.policy.readModeAP.ONE,
+          readModeSC: Aerospike.policy.readModeSC.SESSION,
           allowInline: false,
           sendSetName: true
         })
@@ -127,7 +130,8 @@ context('Client Policies #noserver', function () {
         expect(subject.socketTimeout).to.equal(1000)
         expect(subject.totalTimeout).to.equal(2000)
         expect(subject.maxRetries).to.equal(1)
-        expect(subject.consistencyLevel).to.equal(Aerospike.policy.consistencyLevel.ONE)
+        expect(subject.readModeAP).to.equal(Aerospike.policy.readModeAP.ONE)
+        expect(subject.readModeSC).to.equal(Aerospike.policy.readModeSC.SESSION)
         expect(subject.allowInline).to.be.false()
         expect(subject.sendSetName).to.be.true()
       })
@@ -137,7 +141,7 @@ context('Client Policies #noserver', function () {
   describe('InfoPolicy', function () {
     describe('new InfoPolicy', function () {
       it('sets the policy values from a value object', function () {
-        let subject = new Aerospike.InfoPolicy({
+        const subject = new Aerospike.InfoPolicy({
           totalTimeout: 1000,
           sendAsIs: true,
           checkBounds: false
@@ -153,7 +157,7 @@ context('Client Policies #noserver', function () {
   describe('RemovePolicy', function () {
     describe('new RemovePolicy', function () {
       it('sets the policy values from a value object', function () {
-        let subject = new Aerospike.RemovePolicy({
+        const subject = new Aerospike.RemovePolicy({
           socketTimeout: 1000,
           totalTimeout: 2000,
           maxRetries: 1,
@@ -179,14 +183,15 @@ context('Client Policies #noserver', function () {
   describe('OperatePolicy', function () {
     describe('new OperatePolicy', function () {
       it('sets the policy values from a value object', function () {
-        let subject = new Aerospike.OperatePolicy({
+        const subject = new Aerospike.OperatePolicy({
           socketTimeout: 1000,
           totalTimeout: 2000,
           maxRetries: 1,
           key: Aerospike.policy.key.SEND,
           gen: Aerospike.policy.gen.EQ,
           replica: Aerospike.policy.replica.MASTER,
-          consistencyLevel: Aerospike.policy.consistencyLevel.ONE,
+          readModeAP: Aerospike.policy.readModeAP.ONE,
+          readModeSC: Aerospike.policy.readModeSC.SESSION,
           commitLevel: 2,
           durableDelete: true
         })
@@ -196,7 +201,8 @@ context('Client Policies #noserver', function () {
         expect(subject.key).to.equal(Aerospike.policy.key.SEND)
         expect(subject.gen).to.equal(Aerospike.policy.gen.EQ)
         expect(subject.replica).to.equal(Aerospike.policy.replica.MASTER)
-        expect(subject.consistencyLevel).to.equal(Aerospike.policy.consistencyLevel.ONE)
+        expect(subject.readModeAP).to.equal(Aerospike.policy.readModeAP.ONE)
+        expect(subject.readModeSC).to.equal(Aerospike.policy.readModeSC.SESSION)
         expect(subject.commitLevel).to.equal(2)
         expect(subject.durableDelete).to.be.true()
       })
@@ -206,7 +212,7 @@ context('Client Policies #noserver', function () {
   describe('ScanPolicy', function () {
     describe('new ScanPolicy', function () {
       it('sets the policy values from a value object', function () {
-        let subject = new Aerospike.ScanPolicy({
+        const subject = new Aerospike.ScanPolicy({
           socketTimeout: 1000,
           totalTimeout: 2000,
           maxRetries: 1,
@@ -226,7 +232,7 @@ context('Client Policies #noserver', function () {
   describe('QueryPolicy', function () {
     describe('new QueryPolicy', function () {
       it('sets the policy values from a value object', function () {
-        let subject = new Aerospike.QueryPolicy({
+        const subject = new Aerospike.QueryPolicy({
           socketTimeout: 1000,
           totalTimeout: 2000,
           maxRetries: 1

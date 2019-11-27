@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright 2013-2018 Aerospike, Inc.
+ * Copyright 2013-2019 Aerospike, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -66,7 +66,7 @@ NAN_METHOD(AerospikeClient::New)
 
 	Local<Object> v8Config = info[0].As<Object>();
 
-	Local<Value> v8LogInfo = v8Config->Get(Nan::New("log").ToLocalChecked()) ;
+	Local<Value> v8LogInfo = Nan::Get(v8Config, Nan::New("log").ToLocalChecked()).ToLocalChecked();
 	if (v8LogInfo->IsObject()) {
 		log_from_jsobject(client->log, v8LogInfo.As<Object>());
 	}
@@ -118,6 +118,7 @@ NAN_METHOD(AerospikeClient::Close)
 	aerospike_destroy(client->as);
 	free(client->as);
 	free(client->log);
+	client->closed = true;
 }
 
 /**
@@ -144,6 +145,35 @@ NAN_METHOD(AerospikeClient::HasPendingAsyncCommands)
 	bool pending = as_async_get_pending(client->as->cluster) > 0;
 
 	info.GetReturnValue().Set(Nan::New(pending));
+}
+
+/**
+ * Get all node names in the cluster.
+ */
+NAN_METHOD(AerospikeClient::GetNodes)
+{
+	Nan::HandleScope scope;
+	AerospikeClient* client = ObjectWrap::Unwrap<AerospikeClient>(info.This());
+
+	as_nodes* nodes = as_nodes_reserve(client->as->cluster);
+	Local<Array> v8_nodes = Nan::New<Array>(nodes->size);
+
+	for (uint32_t i = 0; i < nodes->size; i++) {
+		as_node* node = nodes->array[i];
+		// reserve node if it will be for a significant period of time.
+		as_node_reserve(node);
+		Local<Object> node_obj = Nan::New<Object>();
+		Nan::Set(node_obj, Nan::New("name").ToLocalChecked(),
+				Nan::New<String>(node->name).ToLocalChecked());
+		Nan::Set(node_obj, Nan::New("address").ToLocalChecked(),
+				Nan::New<String>(as_node_get_address_string(node))
+				.ToLocalChecked());
+		Nan::Set(v8_nodes, i, node_obj);
+		as_node_release(node);
+	}
+
+	as_nodes_release(nodes);
+	info.GetReturnValue().Set(v8_nodes);
 }
 
 /**
@@ -247,11 +277,15 @@ void AerospikeClient::Init()
 	Nan::SetPrototypeMethod(tpl, "connect", Connect);
 	Nan::SetPrototypeMethod(tpl, "existsAsync", ExistsAsync);
 	Nan::SetPrototypeMethod(tpl, "getAsync", GetAsync);
+	Nan::SetPrototypeMethod(tpl, "getNodes", GetNodes);
+	Nan::SetPrototypeMethod(tpl, "getStats", GetStats);
 	Nan::SetPrototypeMethod(tpl, "hasPendingAsyncCommands", HasPendingAsyncCommands);
 	Nan::SetPrototypeMethod(tpl, "indexCreate", IndexCreate);
 	Nan::SetPrototypeMethod(tpl, "indexRemove", IndexRemove);
-	Nan::SetPrototypeMethod(tpl, "info", Info);
+	Nan::SetPrototypeMethod(tpl, "infoAny", InfoAny);
 	Nan::SetPrototypeMethod(tpl, "infoForeach", InfoForeach);
+	Nan::SetPrototypeMethod(tpl, "infoHost", InfoHost);
+	Nan::SetPrototypeMethod(tpl, "infoNode", InfoNode);
 	Nan::SetPrototypeMethod(tpl, "isConnected", IsConnected);
 	Nan::SetPrototypeMethod(tpl, "jobInfo", JobInfo);
 	Nan::SetPrototypeMethod(tpl, "operateAsync", OperateAsync);

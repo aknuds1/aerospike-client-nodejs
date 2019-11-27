@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright 2013-2017 Aerospike, Inc.
+ * Copyright 2013-2019 Aerospike, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,7 +23,7 @@ extern "C" {
 
 using namespace v8;
 
-#define set(__obj, __name, __value) __obj->Set(Nan::New(__name).ToLocalChecked(), Nan::New(__value))
+#define set(__obj, __name, __value) Nan::Set(__obj, Nan::New(__name).ToLocalChecked(), Nan::New(__value))
 
 Local<Object> status()
 {
@@ -66,7 +66,8 @@ Local<Object> status()
 	set(obj, "AEROSPIKE_ERR_FAIL_FORBIDDEN", AEROSPIKE_ERR_FAIL_FORBIDDEN);
 	set(obj, "AEROSPIKE_ERR_FAIL_ELEMENT_NOT_FOUND", AEROSPIKE_ERR_FAIL_ELEMENT_NOT_FOUND);
 	set(obj, "AEROSPIKE_ERR_FAIL_ELEMENT_EXISTS", AEROSPIKE_ERR_FAIL_ELEMENT_EXISTS);
-	set(obj, "AEROSPIKE_ERR_FAIL_ENTERPRISE_ONLY", 25); // TODO: replace with C client enum
+	set(obj, "AEROSPIKE_ERR_ENTERPRISE_ONLY", AEROSPIKE_ERR_ENTERPRISE_ONLY);
+	set(obj, "AEROSPIKE_ERR_OP_NOT_APPLICABLE", AEROSPIKE_ERR_OP_NOT_APPLICABLE);
 	set(obj, "AEROSPIKE_QUERY_END", AEROSPIKE_QUERY_END);
 	set(obj, "AEROSPIKE_SECURITY_NOT_SUPPORTED", AEROSPIKE_SECURITY_NOT_SUPPORTED);
 	set(obj, "AEROSPIKE_SECURITY_NOT_ENABLED", AEROSPIKE_SECURITY_NOT_ENABLED);
@@ -86,7 +87,6 @@ Local<Object> status()
 	set(obj, "AEROSPIKE_NOT_AUTHENTICATED", AEROSPIKE_NOT_AUTHENTICATED);
 	set(obj, "AEROSPIKE_ROLE_VIOLATION", AEROSPIKE_ROLE_VIOLATION);
 	set(obj, "AEROSPIKE_ERR_UDF", AEROSPIKE_ERR_UDF);
-	set(obj, "AEROSPIKE_ERR_LARGE_ITEM_NOT_FOUND", AEROSPIKE_ERR_LARGE_ITEM_NOT_FOUND);
 	set(obj, "AEROSPIKE_ERR_BATCH_DISABLED", AEROSPIKE_ERR_BATCH_DISABLED);
 	set(obj, "AEROSPIKE_ERR_BATCH_MAX_REQUESTS_EXCEEDED", AEROSPIKE_ERR_BATCH_MAX_REQUESTS_EXCEEDED);
 	set(obj, "AEROSPIKE_ERR_BATCH_QUEUES_FULL", AEROSPIKE_ERR_BATCH_QUEUES_FULL);

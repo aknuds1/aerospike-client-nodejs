@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // *****************************************************************************
-// Copyright 2013-2018 Aerospike, Inc.
+// Copyright 2013-2019 Aerospike, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License")
 // you may not use this file except in compliance with the License.
@@ -63,7 +63,7 @@ exports.builder = yargs => {
       desc: 'Create a secondary index',
       handler: shared.run(sindexCreate),
       builder: {
-        'type': {
+        type: {
           choices: ['numeric', 'string', 'geo2dsphere'],
           hidden: true
         }

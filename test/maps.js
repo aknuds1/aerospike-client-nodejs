@@ -1,5 +1,5 @@
 // *****************************************************************************
-// Copyright 2013-2018 Aerospike, Inc.
+// Copyright 2013-2019 Aerospike, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License")
 // you may not use this file except in compliance with the License.
@@ -17,128 +17,39 @@
 'use strict'
 
 /* eslint-env mocha */
-/* global expect */
 
 const Aerospike = require('../lib/aerospike')
 const helper = require('./test_helper')
 
-const AerospikeError = Aerospike.AerospikeError
 const maps = Aerospike.maps
+const Context = Aerospike.cdt.Context
 const status = Aerospike.status
 
 const eql = require('deep-eql')
 
+const {
+  assertError,
+  assertRecordEql,
+  assertResultEql,
+  assertResultSatisfy,
+  cleanup,
+  createRecord,
+  expectError,
+  initState,
+  operate
+} = require('./util/statefulAsyncTest')
+
+const orderMap = (bin, order, ctx) => {
+  const policy = new maps.MapPolicy({ order })
+  const setMapPolicy = maps.setPolicy(bin, policy)
+  if (ctx) setMapPolicy.withContext(ctx)
+  return operate(setMapPolicy)
+}
+const orderByKey = (bin, ctx) => orderMap(bin, maps.order.KEY_ORDERED, ctx)
+const orderByKeyValue = (bin, ctx) => orderMap(bin, maps.order.KEY_VALUE_ORDERED, ctx)
+
 describe('client.operate() - CDT Map operations', function () {
-  helper.cluster.skip_unless_supports_feature('cdt-map', this)
-
-  let client = helper.client
-
-  class State {
-    enrich (name, promise) {
-      if (this._expectError) {
-        return promise.catch(error => {
-          this['error'] = error
-          return this
-        })
-      } else {
-        return promise.then(value => {
-          this[name] = value
-          return this
-        })
-      }
-    }
-
-    passthrough (promise) {
-      return promise.then(() => this)
-    }
-
-    resolve (value) {
-      return Promise.resolve(value).then(() => this)
-    }
-
-    expectError () {
-      this._expectError = true
-      return this
-    }
-  }
-
-  function initState () {
-    return Promise.resolve(new State())
-  }
-
-  function expectError () {
-    return function (state) {
-      return state.expectError()
-    }
-  }
-
-  function createRecord (bins) {
-    return function (state) {
-      let key = helper.keygen.string(helper.namespace, helper.set, {prefix: 'cdt_map/'})()
-      let meta = { ttl: 600 }
-      let policy = new Aerospike.WritePolicy({
-        exists: Aerospike.policy.exists.CREATE_OR_REPLACE
-      })
-      return state.enrich('key', client.put(key, bins, meta, policy))
-    }
-  }
-
-  function operate (ops) {
-    if (!Array.isArray(ops)) {
-      ops = [ops]
-    }
-    return function (state) {
-      return state.enrich('result', client.operate(state.key, ops))
-    }
-  }
-
-  function orderByKey (bin) {
-    let policy = new maps.MapPolicy({
-      order: maps.order.KEY_ORDERED
-    })
-    return operate(maps.setPolicy(bin, policy))
-  }
-
-  function orderByKeyValue (bin) {
-    let policy = new maps.MapPolicy({
-      order: maps.order.KEY_VALUE_ORDERED
-    })
-    return operate(maps.setPolicy(bin, policy))
-  }
-
-  function assertResultEql (expected) {
-    return function (state) {
-      return state.resolve(expect(state.result.bins).to.eql(expected, 'operate result'))
-    }
-  }
-
-  function assertResultSatisfy (matcher) {
-    return function (state) {
-      return state.resolve(expect(state.result.bins).to.satisfy(matcher, 'operate result'))
-    }
-  }
-
-  function assertRecordEql (expected) {
-    return function (state) {
-      return state.passthrough(client.get(state.key)
-        .then(record => expect(record.bins).to.eql(expected, 'record bins after operation')))
-    }
-  }
-
-  function assertError (code) {
-    return function (state) {
-      return state.resolve(
-        expect(state.error, 'error raised by operate command')
-          .to.be.instanceof(AerospikeError)
-          .with.property('code', code))
-    }
-  }
-
-  function cleanup () {
-    return function (state) {
-      return state.passthrough(client.remove(state.key))
-    }
-  }
+  helper.skipUnlessSupportsFeature(Aerospike.features.CDT_MAP, this)
 
   describe('maps.setPolicy', function () {
     it('changes the map order', function () {
@@ -163,10 +74,10 @@ describe('client.operate() - CDT Map operations', function () {
 
     it('replaces the item and returns the size of the map', function () {
       return initState()
-        .then(createRecord({ map: {a: 1, b: 2, c: 3} }))
+        .then(createRecord({ map: { a: 1, b: 2, c: 3 } }))
         .then(operate(maps.put('map', 'b', 99)))
         .then(assertResultEql({ map: 3 }))
-        .then(assertRecordEql({ map: {a: 1, b: 99, c: 3} }))
+        .then(assertRecordEql({ map: { a: 1, b: 99, c: 3 } }))
         .then(cleanup())
     })
 
@@ -175,7 +86,7 @@ describe('client.operate() - CDT Map operations', function () {
         .then(createRecord({ i: 1 }))
         .then(operate(maps.put('map', 'a', 1)))
         .then(assertResultEql({ map: 1 }))
-        .then(assertRecordEql({ i: 1, map: {a: 1} }))
+        .then(assertRecordEql({ i: 1, map: { a: 1 } }))
         .then(cleanup())
     })
 
@@ -189,22 +100,22 @@ describe('client.operate() - CDT Map operations', function () {
     })
 
     context('update-only write mode', function () {
-      let updateOnlyPolicy = new maps.MapPolicy({
+      const updateOnlyPolicy = new maps.MapPolicy({
         writeMode: maps.writeMode.UPDATE_ONLY
       })
 
       it('overwrites an existing key', function () {
         return initState()
-          .then(createRecord({ map: {a: 1, b: 2, c: 3} }))
+          .then(createRecord({ map: { a: 1, b: 2, c: 3 } }))
           .then(operate(maps.put('map', 'b', 99, updateOnlyPolicy)))
           .then(assertResultEql({ map: 3 }))
-          .then(assertRecordEql({ map: {a: 1, b: 99, c: 3} }))
+          .then(assertRecordEql({ map: { a: 1, b: 99, c: 3 } }))
           .then(cleanup())
       })
 
       it('fails to write a non-existing key', function () {
         return initState()
-          .then(createRecord({ map: {a: 1, b: 2, c: 3} }))
+          .then(createRecord({ map: { a: 1, b: 2, c: 3 } }))
           .then(expectError())
           .then(operate(maps.put('map', 'd', 99, updateOnlyPolicy)))
           .then(assertError(status.ERR_FAIL_ELEMENT_NOT_FOUND))
@@ -213,24 +124,24 @@ describe('client.operate() - CDT Map operations', function () {
     })
 
     context('with update-only flag', function () {
-      helper.cluster.skip_unless_version('4.3.0', this)
+      helper.skipUnlessVersion('>= 4.3.0', this)
 
-      let policy = new maps.MapPolicy({
+      const policy = new maps.MapPolicy({
         writeFlags: maps.writeFlags.UPDATE_ONLY
       })
 
       it('overwrites an existing key', function () {
         return initState()
-          .then(createRecord({ map: {a: 1, b: 2, c: 3} }))
+          .then(createRecord({ map: { a: 1, b: 2, c: 3 } }))
           .then(operate(maps.put('map', 'b', 99, policy)))
           .then(assertResultEql({ map: 3 }))
-          .then(assertRecordEql({ map: {a: 1, b: 99, c: 3} }))
+          .then(assertRecordEql({ map: { a: 1, b: 99, c: 3 } }))
           .then(cleanup())
       })
 
       it('fails to write a non-existing key', function () {
         return initState()
-          .then(createRecord({ map: {a: 1, b: 2, c: 3} }))
+          .then(createRecord({ map: { a: 1, b: 2, c: 3 } }))
           .then(expectError())
           .then(operate(maps.put('map', 'd', 99, policy)))
           .then(assertError(status.ERR_FAIL_ELEMENT_NOT_FOUND))
@@ -238,29 +149,29 @@ describe('client.operate() - CDT Map operations', function () {
       })
 
       context('with no-fail flag', function () {
-        let policy = new maps.MapPolicy({
+        const policy = new maps.MapPolicy({
           writeFlags: maps.writeFlags.UPDATE_ONLY | maps.writeFlags.NO_FAIL
         })
 
         it('does not add the item but returns ok', function () {
           return initState()
-            .then(createRecord({ map: {a: 1, b: 2, c: 3} }))
+            .then(createRecord({ map: { a: 1, b: 2, c: 3 } }))
             .then(operate(maps.put('map', 'd', 99, policy)))
             .then(assertResultEql({ map: 3 }))
-            .then(assertRecordEql({ map: {a: 1, b: 2, c: 3} }))
+            .then(assertRecordEql({ map: { a: 1, b: 2, c: 3 } }))
             .then(cleanup())
         })
       })
     })
 
     context('create-only write mode', function () {
-      let createOnlyPolicy = new maps.MapPolicy({
+      const createOnlyPolicy = new maps.MapPolicy({
         writeMode: maps.writeMode.CREATE_ONLY
       })
 
       it('fails to overwrite an existing key', function () {
         return initState()
-          .then(createRecord({ map: {a: 1, b: 2, c: 3} }))
+          .then(createRecord({ map: { a: 1, b: 2, c: 3 } }))
           .then(expectError())
           .then(operate(maps.put('map', 'b', 99, createOnlyPolicy)))
           .then(assertError(status.ERR_FAIL_ELEMENT_EXISTS))
@@ -269,24 +180,24 @@ describe('client.operate() - CDT Map operations', function () {
 
       it('creates a new key if it does not exist', function () {
         return initState()
-          .then(createRecord({ map: {a: 1, b: 2, c: 3} }))
+          .then(createRecord({ map: { a: 1, b: 2, c: 3 } }))
           .then(operate(maps.put('map', 'd', 99, createOnlyPolicy)))
           .then(assertResultEql({ map: 4 }))
-          .then(assertRecordEql({ map: {a: 1, b: 2, c: 3, d: 99} }))
+          .then(assertRecordEql({ map: { a: 1, b: 2, c: 3, d: 99 } }))
           .then(cleanup())
       })
     })
 
     context('with create-only flag', function () {
-      helper.cluster.skip_unless_version('4.3.0', this)
+      helper.skipUnlessVersion('>= 4.3.0', this)
 
-      let policy = new maps.MapPolicy({
+      const policy = new maps.MapPolicy({
         writeFlags: maps.writeFlags.CREATE_ONLY
       })
 
       it('fails to overwrite an existing key', function () {
         return initState()
-          .then(createRecord({ map: {a: 1, b: 2, c: 3} }))
+          .then(createRecord({ map: { a: 1, b: 2, c: 3 } }))
           .then(expectError())
           .then(operate(maps.put('map', 'b', 99, policy)))
           .then(assertError(status.ERR_FAIL_ELEMENT_EXISTS))
@@ -295,26 +206,39 @@ describe('client.operate() - CDT Map operations', function () {
 
       it('creates a new key if it does not exist', function () {
         return initState()
-          .then(createRecord({ map: {a: 1, b: 2, c: 3} }))
+          .then(createRecord({ map: { a: 1, b: 2, c: 3 } }))
           .then(operate(maps.put('map', 'd', 99, policy)))
           .then(assertResultEql({ map: 4 }))
-          .then(assertRecordEql({ map: {a: 1, b: 2, c: 3, d: 99} }))
+          .then(assertRecordEql({ map: { a: 1, b: 2, c: 3, d: 99 } }))
           .then(cleanup())
       })
 
       context('with no-fail flag', function () {
-        let policy = new maps.MapPolicy({
+        const policy = new maps.MapPolicy({
           writeFlags: maps.writeFlags.CREATE_ONLY | maps.writeFlags.NO_FAIL
         })
 
         it('does not update the item but returns ok', function () {
           return initState()
-            .then(createRecord({ map: {a: 1, b: 2, c: 3} }))
+            .then(createRecord({ map: { a: 1, b: 2, c: 3 } }))
             .then(operate(maps.put('map', 'b', 99, policy)))
             .then(assertResultEql({ map: 3 }))
-            .then(assertRecordEql({ map: {a: 1, b: 2, c: 3} }))
+            .then(assertRecordEql({ map: { a: 1, b: 2, c: 3 } }))
             .then(cleanup())
         })
+      })
+    })
+
+    context('with nested map context', function () {
+      helper.skipUnlessVersion('>= 4.6.0', this)
+
+      it('adds the item to the nested map', function () {
+        return initState()
+          .then(createRecord({ list: [{ a: 1, b: 2, c: 3 }] }))
+          .then(operate(maps.put('list', 'd', 99).withContext(ctx => ctx.addListIndex(0))))
+          .then(assertResultEql({ list: 4 }))
+          .then(assertRecordEql({ list: [{ a: 1, b: 2, c: 3, d: 99 }] }))
+          .then(cleanup())
       })
     })
   })
@@ -322,23 +246,23 @@ describe('client.operate() - CDT Map operations', function () {
   describe('maps.putItems', function () {
     it('adds each item to the map and returns the size of the map', function () {
       return initState()
-        .then(createRecord({ map: {a: 1, b: 2, c: 3} }))
+        .then(createRecord({ map: { a: 1, b: 2, c: 3 } }))
         .then(operate(maps.putItems('map', { c: 99, d: 100 })))
         .then(assertResultEql({ map: 4 }))
-        .then(assertRecordEql({ map: {a: 1, b: 2, c: 99, d: 100} }))
+        .then(assertRecordEql({ map: { a: 1, b: 2, c: 99, d: 100 } }))
         .then(cleanup())
     })
 
     context('with update-only flag', function () {
-      helper.cluster.skip_unless_version('4.3.0', this)
+      helper.skipUnlessVersion('>= 4.3.0', this)
 
-      let policy = new maps.MapPolicy({
+      const policy = new maps.MapPolicy({
         writeFlags: maps.writeFlags.UPDATE_ONLY
       })
 
       it('fails if any of the items do not yet exist in the map', function () {
         return initState()
-          .then(createRecord({ map: {a: 1, b: 2, c: 3, d: 4, e: 5} }))
+          .then(createRecord({ map: { a: 1, b: 2, c: 3, d: 4, e: 5 } }))
           .then(expectError())
           .then(operate(maps.putItems('map', { c: 10, x: 100 }, policy)))
           .then(assertError(status.ERR_FAIL_ELEMENT_NOT_FOUND))
@@ -346,30 +270,30 @@ describe('client.operate() - CDT Map operations', function () {
       })
 
       context('with no-fail flag', function () {
-        let policy = new maps.MapPolicy({
+        const policy = new maps.MapPolicy({
           writeFlags: maps.writeFlags.UPDATE_ONLY | maps.writeFlags.NO_FAIL
         })
 
         it('does not update the map but returns ok', function () {
           return initState()
-            .then(createRecord({ map: {a: 1, b: 2, c: 3, d: 4, e: 5} }))
+            .then(createRecord({ map: { a: 1, b: 2, c: 3, d: 4, e: 5 } }))
             .then(operate(maps.putItems('map', { c: 10, x: 100 }, policy)))
             .then(assertResultEql({ map: 5 }))
-            .then(assertRecordEql({ map: {a: 1, b: 2, c: 3, d: 4, e: 5} }))
+            .then(assertRecordEql({ map: { a: 1, b: 2, c: 3, d: 4, e: 5 } }))
             .then(cleanup())
         })
 
         context('with partial flag', function () {
-          let policy = new maps.MapPolicy({
+          const policy = new maps.MapPolicy({
             writeFlags: maps.writeFlags.UPDATE_ONLY | maps.writeFlags.NO_FAIL | maps.writeFlags.PARTIAL
           })
 
           it('updates only the existing items', function () {
             return initState()
-              .then(createRecord({ map: {a: 1, b: 2, c: 3, d: 4, e: 5} }))
+              .then(createRecord({ map: { a: 1, b: 2, c: 3, d: 4, e: 5 } }))
               .then(operate(maps.putItems('map', { c: 10, x: 100 }, policy)))
               .then(assertResultEql({ map: 5 }))
-              .then(assertRecordEql({ map: {a: 1, b: 2, c: 10, d: 4, e: 5} }))
+              .then(assertRecordEql({ map: { a: 1, b: 2, c: 10, d: 4, e: 5 } }))
               .then(cleanup())
           })
         })
@@ -377,15 +301,15 @@ describe('client.operate() - CDT Map operations', function () {
     })
 
     context('with create-only flag', function () {
-      helper.cluster.skip_unless_version('4.3.0', this)
+      helper.skipUnlessVersion('>= 4.3.0', this)
 
-      let policy = new maps.MapPolicy({
+      const policy = new maps.MapPolicy({
         writeFlags: maps.writeFlags.CREATE_ONLY
       })
 
       it('fails if any of the items already exist in the map', function () {
         return initState()
-          .then(createRecord({ map: {a: 1, b: 2, c: 3, d: 4, e: 5} }))
+          .then(createRecord({ map: { a: 1, b: 2, c: 3, d: 4, e: 5 } }))
           .then(expectError())
           .then(operate(maps.putItems('map', { c: 10, x: 100 }, policy)))
           .then(assertError(status.ERR_FAIL_ELEMENT_EXISTS))
@@ -393,33 +317,46 @@ describe('client.operate() - CDT Map operations', function () {
       })
 
       context('with no-fail flag', function () {
-        let policy = new maps.MapPolicy({
+        const policy = new maps.MapPolicy({
           writeFlags: maps.writeFlags.CREATE_ONLY | maps.writeFlags.NO_FAIL
         })
 
         it('does not update the map but returns ok', function () {
           return initState()
-            .then(createRecord({ map: {a: 1, b: 2, c: 3, d: 4, e: 5} }))
+            .then(createRecord({ map: { a: 1, b: 2, c: 3, d: 4, e: 5 } }))
             .then(operate(maps.putItems('map', { c: 10, x: 100 }, policy)))
             .then(assertResultEql({ map: 5 }))
-            .then(assertRecordEql({ map: {a: 1, b: 2, c: 3, d: 4, e: 5} }))
+            .then(assertRecordEql({ map: { a: 1, b: 2, c: 3, d: 4, e: 5 } }))
             .then(cleanup())
         })
 
         context('with partial flag', function () {
-          let policy = new maps.MapPolicy({
+          const policy = new maps.MapPolicy({
             writeFlags: maps.writeFlags.CREATE_ONLY | maps.writeFlags.NO_FAIL | maps.writeFlags.PARTIAL
           })
 
           it('adds only the keys that do not exist yet', function () {
             return initState()
-              .then(createRecord({ map: {a: 1, b: 2, c: 3, d: 4, e: 5} }))
+              .then(createRecord({ map: { a: 1, b: 2, c: 3, d: 4, e: 5 } }))
               .then(operate(maps.putItems('map', { c: 10, x: 100 }, policy)))
               .then(assertResultEql({ map: 6 }))
-              .then(assertRecordEql({ map: {a: 1, b: 2, c: 3, d: 4, e: 5, x: 100} }))
+              .then(assertRecordEql({ map: { a: 1, b: 2, c: 3, d: 4, e: 5, x: 100 } }))
               .then(cleanup())
           })
         })
+      })
+    })
+
+    context('with nested map context', function () {
+      helper.skipUnlessVersion('>= 4.6.0', this)
+
+      it('adds each item to the nested map', function () {
+        return initState()
+          .then(createRecord({ map: { nested: { a: 1, b: 2, c: 3 } } }))
+          .then(operate(maps.putItems('map', { c: 99, d: 100 }).withContext(ctx => ctx.addMapKey('nested'))))
+          .then(assertResultEql({ map: 4 }))
+          .then(assertRecordEql({ map: { nested: { a: 1, b: 2, c: 99, d: 100 } } }))
+          .then(cleanup())
       })
     })
   })
@@ -427,137 +364,217 @@ describe('client.operate() - CDT Map operations', function () {
   describe('maps.increment', function () {
     it('increments the value of the entry and returns the final value', function () {
       return initState()
-        .then(createRecord({ map: {a: 1, b: 2, c: 3} }))
+        .then(createRecord({ map: { a: 1, b: 2, c: 3 } }))
         .then(operate(maps.increment('map', 'b', 10)))
         .then(assertResultEql({ map: 12 }))
-        .then(assertRecordEql({ map: {a: 1, b: 12, c: 3} }))
+        .then(assertRecordEql({ map: { a: 1, b: 12, c: 3 } }))
         .then(cleanup())
     })
 
     it('creates a new entry if the key does not exist yet', function () {
       return initState()
-        .then(createRecord({ map: {a: 1, b: 2, c: 3} }))
+        .then(createRecord({ map: { a: 1, b: 2, c: 3 } }))
         .then(operate(maps.increment('map', 'd', 10)))
         .then(assertResultEql({ map: 10 }))
-        .then(assertRecordEql({ map: {a: 1, b: 2, c: 3, d: 10} }))
+        .then(assertRecordEql({ map: { a: 1, b: 2, c: 3, d: 10 } }))
         .then(cleanup())
+    })
+
+    context('with nested map context', function () {
+      helper.skipUnlessVersion('>= 4.6.0', this)
+
+      it('increments the value of the entry and returns the final value', function () {
+        return initState()
+          .then(createRecord({ list: [[1, 2, 3], { a: 1, b: 2, c: 3 }] }))
+          .then(operate(maps.increment('list', 'b', 10).withContext(ctx => ctx.addListIndex(1))))
+          .then(assertResultEql({ list: 12 }))
+          .then(assertRecordEql({ list: [[1, 2, 3], { a: 1, b: 12, c: 3 }] }))
+          .then(cleanup())
+      })
     })
   })
 
   describe('maps.decrement', function () {
     it('decrements the value of the entry and returns the final value', function () {
       return initState()
-        .then(createRecord({ map: {a: 1, b: 12, c: 3} }))
+        .then(createRecord({ map: { a: 1, b: 12, c: 3 } }))
         .then(operate(maps.decrement('map', 'b', 10)))
         .then(assertResultEql({ map: 2 }))
-        .then(assertRecordEql({ map: {a: 1, b: 2, c: 3} }))
+        .then(assertRecordEql({ map: { a: 1, b: 2, c: 3 } }))
         .then(cleanup())
     })
 
     it('creates a new entry if the key does not exist yet', function () {
       return initState()
-        .then(createRecord({ map: {a: 1, b: 2, c: 3} }))
+        .then(createRecord({ map: { a: 1, b: 2, c: 3 } }))
         .then(operate(maps.decrement('map', 'd', 1)))
         .then(assertResultEql({ map: -1 }))
-        .then(assertRecordEql({ map: {a: 1, b: 2, c: 3, d: -1} }))
+        .then(assertRecordEql({ map: { a: 1, b: 2, c: 3, d: -1 } }))
         .then(cleanup())
+    })
+
+    context('with nested map context', function () {
+      helper.skipUnlessVersion('>= 4.6.0', this)
+
+      it('decrements the value of the entry and returns the final value', function () {
+        return initState()
+          .then(createRecord({ list: [{ a: 1, b: 12, c: 3 }, ['a', 'b', 'c']] }))
+          .then(operate(maps.decrement('list', 'b', 10).withContext(ctx => ctx.addListIndex(0))))
+          .then(assertResultEql({ list: 2 }))
+          .then(assertRecordEql({ list: [{ a: 1, b: 2, c: 3 }, ['a', 'b', 'c']] }))
+          .then(cleanup())
+      })
     })
   })
 
   describe('maps.clear', function () {
     it('removes all entries from the map', function () {
       return initState()
-        .then(createRecord({ map: {a: 1, b: 12, c: 3} }))
+        .then(createRecord({ map: { a: 1, b: 12, c: 3 } }))
         .then(operate(maps.clear('map')))
         .then(assertResultEql({ map: null }))
         .then(assertRecordEql({ map: { } }))
         .then(cleanup())
+    })
+
+    context('with nested map context', function () {
+      helper.skipUnlessVersion('>= 4.6.0', this)
+
+      it('removes all entries from the map', function () {
+        return initState()
+          .then(createRecord({ map: { nested: { deepNested: { a: 1, b: 12, c: 3 } } } }))
+          .then(operate(
+            maps
+              .clear('map')
+              .withContext(ctx => ctx.addMapKey('nested').addMapKey('deepNested'))
+          ))
+          .then(assertRecordEql({ map: { nested: { deepNested: { } } } }))
+          .then(cleanup())
+      })
     })
   })
 
   describe('maps.removeByKey', function () {
     it('removes a map entry identified by key', function () {
       return initState()
-        .then(createRecord({ map: {a: 1, b: 2, c: 3} }))
+        .then(createRecord({ map: { a: 1, b: 2, c: 3 } }))
         .then(operate(maps.removeByKey('map', 'b', maps.returnType.VALUE)))
         .then(assertResultEql({ map: 2 }))
-        .then(assertRecordEql({ map: {a: 1, c: 3} }))
+        .then(assertRecordEql({ map: { a: 1, c: 3 } }))
         .then(cleanup())
     })
 
     it('does not fail when removing a non-existing key', function () {
       return initState()
-        .then(createRecord({ map: {a: 1, b: 2, c: 3} }))
+        .then(createRecord({ map: { a: 1, b: 2, c: 3 } }))
         .then(operate(maps.removeByKey('map', 'd', maps.returnType.VALUE)))
         .then(assertResultEql({ map: null }))
-        .then(assertRecordEql({ map: {a: 1, b: 2, c: 3} }))
+        .then(assertRecordEql({ map: { a: 1, b: 2, c: 3 } }))
         .then(cleanup())
+    })
+
+    context('with nested map context', function () {
+      helper.skipUnlessVersion('>= 4.6.0', this)
+
+      it('removes a map entry identified by key', function () {
+        return initState()
+          .then(createRecord({ list: [{ a: 1, b: 2, c: 3 }, { a: 2, b: 3, c: 4 }] }))
+          .then(operate(maps.removeByKey('list', 'b').withContext(ctx => ctx.addListIndex(-1))))
+          .then(assertRecordEql({ list: [{ a: 1, b: 2, c: 3 }, { a: 2, c: 4 }] }))
+          .then(cleanup())
+      })
     })
   })
 
   describe('maps.removeByKeyList', function () {
     it('removes map entries identified by one or more keys', function () {
       return initState()
-        .then(createRecord({ map: {a: 1, b: 2, c: 3} }))
+        .then(createRecord({ map: { a: 1, b: 2, c: 3 } }))
         .then(operate(maps.removeByKeyList('map', ['a', 'c'], maps.returnType.VALUE)))
         .then(assertResultSatisfy(result => eql(result.map.sort(), [1, 3])))
-        .then(assertRecordEql({ map: {b: 2} }))
+        .then(assertRecordEql({ map: { b: 2 } }))
         .then(cleanup())
     })
 
     it('skips non-existent keys', function () {
       return initState()
-        .then(createRecord({ map: {a: 1, b: 2, c: 3} }))
+        .then(createRecord({ map: { a: 1, b: 2, c: 3 } }))
         .then(operate(maps.removeByKeyList('map', ['a', 'x', 'y', 'z', 'c'], maps.returnType.VALUE)))
         .then(assertResultSatisfy(result => eql(result.map.sort(), [1, 3])))
-        .then(assertRecordEql({ map: {b: 2} }))
+        .then(assertRecordEql({ map: { b: 2 } }))
         .then(cleanup())
+    })
+
+    context('with nested map context', function () {
+      helper.skipUnlessVersion('>= 4.6.0', this)
+
+      it('removes map entries identified by one or more keys', function () {
+        return initState()
+          .then(createRecord({ maps: { a: { a: 1, b: 2, c: 3 }, b: { a: 2, b: 3, c: 4 } } }))
+          .then(operate(maps.removeByKeyList('maps', ['a', 'c']).withContext(ctx => ctx.addMapKey('a'))))
+          .then(assertRecordEql({ maps: { a: { b: 2 }, b: { a: 2, b: 3, c: 4 } } }))
+          .then(cleanup())
+      })
     })
   })
 
   describe('maps.removeByKeyRange', function () {
     it('removes map entries identified by key range', function () {
       return initState()
-        .then(createRecord({ map: {a: 1, b: 2, c: 3, d: 4} }))
+        .then(createRecord({ map: { a: 1, b: 2, c: 3, d: 4 } }))
         .then(orderByKey('map'))
         .then(operate(maps.removeByKeyRange('map', 'b', 'd', maps.returnType.VALUE)))
         .then(assertResultEql({ map: [2, 3] }))
-        .then(assertRecordEql({ map: {a: 1, d: 4} }))
+        .then(assertRecordEql({ map: { a: 1, d: 4 } }))
         .then(cleanup())
     })
 
     it('removes all keys from the specified start key until the end', function () {
       return initState()
-        .then(createRecord({ map: {a: 1, b: 2, c: 3, d: 4} }))
+        .then(createRecord({ map: { a: 1, b: 2, c: 3, d: 4 } }))
         .then(orderByKey('map'))
         .then(operate(maps.removeByKeyRange('map', 'b', null, maps.returnType.VALUE)))
         .then(assertResultEql({ map: [2, 3, 4] }))
-        .then(assertRecordEql({ map: {a: 1} }))
+        .then(assertRecordEql({ map: { a: 1 } }))
         .then(cleanup())
     })
 
     it('removes all keys from the start to the specified end', function () {
       return initState()
-        .then(createRecord({ map: {a: 1, b: 2, c: 3, d: 4} }))
+        .then(createRecord({ map: { a: 1, b: 2, c: 3, d: 4 } }))
         .then(orderByKey('map'))
         .then(operate(maps.removeByKeyRange('map', null, 'b', maps.returnType.VALUE)))
         .then(assertResultEql({ map: [1] }))
-        .then(assertRecordEql({ map: {b: 2, c: 3, d: 4} }))
+        .then(assertRecordEql({ map: { b: 2, c: 3, d: 4 } }))
         .then(cleanup())
+    })
+
+    context('with nested map context', function () {
+      helper.skipUnlessVersion('>= 4.6.0', this)
+
+      it('removes map entries identified by key range', function () {
+        const mapContext = new Context().addListIndex(0)
+        return initState()
+          .then(createRecord({ list: [{ a: 1, b: 2, c: 3, d: 4 }] }))
+          .then(orderByKey('list', mapContext))
+          .then(operate(maps.removeByKeyRange('list', 'b', 'd').withContext(mapContext)))
+          .then(assertRecordEql({ list: [{ a: 1, d: 4 }] }))
+          .then(cleanup())
+      })
     })
   })
 
   describe('maps.removeByKeyRelIndexRange', function () {
-    helper.cluster.skip_unless_version('4.3.0', this)
+    helper.skipUnlessVersion('>= 4.3.0', this)
 
     context('with count', function () {
       it('removes map entries nearest to key and greater, by index', function () {
         return initState()
-          .then(createRecord({ map: {a: 17, e: 2, f: 15, j: 10} }))
+          .then(createRecord({ map: { a: 17, e: 2, f: 15, j: 10 } }))
           .then(orderByKey('map'))
           .then(operate(maps.removeByKeyRelIndexRange('map', 'f', 0, 1).andReturn(maps.returnType.KEY)))
           .then(assertResultEql({ map: ['f'] }))
-          .then(assertRecordEql({ map: {a: 17, e: 2, j: 10} }))
+          .then(assertRecordEql({ map: { a: 17, e: 2, j: 10 } }))
           .then(cleanup())
       })
     })
@@ -565,11 +582,25 @@ describe('client.operate() - CDT Map operations', function () {
     context('without count', function () {
       it('removes map entries nearest to key and greater, by index', function () {
         return initState()
-          .then(createRecord({ map: {a: 17, e: 2, f: 15, j: 10} }))
+          .then(createRecord({ map: { a: 17, e: 2, f: 15, j: 10 } }))
           .then(orderByKey('map'))
           .then(operate(maps.removeByKeyRelIndexRange('map', 'f', 0).andReturn(maps.returnType.KEY)))
           .then(assertResultEql({ map: ['f', 'j'] }))
-          .then(assertRecordEql({ map: {a: 17, e: 2} }))
+          .then(assertRecordEql({ map: { a: 17, e: 2 } }))
+          .then(cleanup())
+      })
+    })
+
+    context('with nested map context', function () {
+      helper.skipUnlessVersion('>= 4.6.0', this)
+
+      it('removes map entries nearest to key and greater, by index', function () {
+        const mapContext = new Context().addListIndex(0)
+        return initState()
+          .then(createRecord({ list: [{ a: 17, e: 2, f: 15, j: 10 }, { a: 32, f: 14 }] }))
+          .then(orderByKey('list', mapContext))
+          .then(operate(maps.removeByKeyRelIndexRange('list', 'f', 0, 1).withContext(mapContext)))
+          .then(assertRecordEql({ list: [{ a: 17, e: 2, j: 10 }, { a: 32, f: 14 }] }))
           .then(cleanup())
       })
     })
@@ -578,74 +609,116 @@ describe('client.operate() - CDT Map operations', function () {
   describe('maps.removeByValue', function () {
     it('removes a map entry identified by value', function () {
       return initState()
-        .then(createRecord({ map: {a: 1, b: 2, c: 3} }))
+        .then(createRecord({ map: { a: 1, b: 2, c: 3 } }))
         .then(operate(maps.removeByValue('map', 2, maps.returnType.RANK)))
         .then(assertResultEql({ map: [1] }))
-        .then(assertRecordEql({ map: {a: 1, c: 3} }))
+        .then(assertRecordEql({ map: { a: 1, c: 3 } }))
         .then(cleanup())
+    })
+
+    context('with nested map context', function () {
+      helper.skipUnlessVersion('>= 4.6.0', this)
+
+      it('removes a map entry identified by value', function () {
+        return initState()
+          .then(createRecord({ list: [{ a: 1, b: 2 }, { a: 1, b: 2 }, { a: 2, b: 3 }] }))
+          .then(operate(
+            maps
+              .removeByValue('list', 2)
+              .withContext(ctx => ctx.addListValue({ a: 1, b: 2 })) // matches only the first list value
+              .andReturn(maps.returnType.RANK)
+          ))
+          .then(assertResultEql({ list: [1] }))
+          .then(assertRecordEql({ list: [{ a: 1 }, { a: 1, b: 2 }, { a: 2, b: 3 }] }))
+          .then(cleanup())
+      })
     })
   })
 
   describe('maps.removeByValueList', function () {
     it('removes map entries identified by one or more values', function () {
       return initState()
-        .then(createRecord({ map: {a: 1, b: 2, c: 3} }))
+        .then(createRecord({ map: { a: 1, b: 2, c: 3 } }))
         .then(operate(maps.removeByValueList('map', [1, 3], maps.returnType.RANK)))
         .then(assertResultEql({ map: [0, 2] }))
-        .then(assertRecordEql({ map: {b: 2} }))
+        .then(assertRecordEql({ map: { b: 2 } }))
         .then(cleanup())
     })
 
     it('skips non-existent values', function () {
       return initState()
-        .then(createRecord({ map: {a: 1, b: 2, c: 3} }))
+        .then(createRecord({ map: { a: 1, b: 2, c: 3 } }))
         .then(operate(maps.removeByValueList('map', [1, 99, 3], maps.returnType.RANK)))
         .then(assertResultEql({ map: [0, 2] }))
-        .then(assertRecordEql({ map: {b: 2} }))
+        .then(assertRecordEql({ map: { b: 2 } }))
         .then(cleanup())
+    })
+
+    context('with nested map context', function () {
+      helper.skipUnlessVersion('>= 4.6.0', this)
+
+      it('removes map entries identified by one or more values', function () {
+        return initState()
+          .then(createRecord({ map: { a: { a: 1, b: 2, c: 3 }, b: { b: 2, c: 3, d: 4 } } }))
+          .then(operate(maps.removeByValueList('map', [1, 3]).withContext(ctx => ctx.addMapKey('a'))))
+          .then(assertRecordEql({ map: { a: { b: 2 }, b: { b: 2, c: 3, d: 4 } } }))
+          .then(cleanup())
+      })
     })
   })
 
   describe('maps.removeByValueRange', function () {
     it('removes map entries identified by value range', function () {
       return initState()
-        .then(createRecord({ map: {a: 1, b: 2, c: 2, d: 3} }))
+        .then(createRecord({ map: { a: 1, b: 2, c: 2, d: 3 } }))
         .then(operate(maps.removeByValueRange('map', 2, 3, maps.returnType.RANK)))
         .then(assertResultEql({ map: [1, 2] }))
-        .then(assertRecordEql({ map: {a: 1, d: 3} }))
+        .then(assertRecordEql({ map: { a: 1, d: 3 } }))
         .then(cleanup())
     })
 
     it('removes all keys from the specified start value until the end', function () {
       return initState()
-        .then(createRecord({ map: {a: 1, b: 2, c: 3} }))
+        .then(createRecord({ map: { a: 1, b: 2, c: 3 } }))
         .then(operate(maps.removeByValueRange('map', 2, null, maps.returnType.RANK)))
         .then(assertResultEql({ map: [1, 2] }))
-        .then(assertRecordEql({ map: {a: 1} }))
+        .then(assertRecordEql({ map: { a: 1 } }))
         .then(cleanup())
     })
 
     it('removes all keys from the start to the specified end value', function () {
       return initState()
-        .then(createRecord({ map: {a: 1, b: 2, c: 3} }))
+        .then(createRecord({ map: { a: 1, b: 2, c: 3 } }))
         .then(operate(maps.removeByValueRange('map', null, 2, maps.returnType.RANK)))
         .then(assertResultEql({ map: [0] }))
-        .then(assertRecordEql({ map: {b: 2, c: 3} }))
+        .then(assertRecordEql({ map: { b: 2, c: 3 } }))
         .then(cleanup())
+    })
+
+    context('with nested map context', function () {
+      helper.skipUnlessVersion('>= 4.6.0', this)
+
+      it('removes map entries identified by value range', function () {
+        return initState()
+          .then(createRecord({ list: [['a', 'b', 'c'], { a: 1, b: 2, c: 2, d: 3 }] }))
+          .then(operate(maps.removeByValueRange('list', 2, 3).withContext(ctx => ctx.addListIndex(-1))))
+          .then(assertRecordEql({ list: [['a', 'b', 'c'], { a: 1, d: 3 }] }))
+          .then(cleanup())
+      })
     })
   })
 
   describe('maps.removeByValueRelRankRange', function () {
-    helper.cluster.skip_unless_version('4.3.0', this)
+    helper.skipUnlessVersion('>= 4.3.0', this)
 
     context('with count', function () {
       it('removes map entries nearest to value and greater by relative rank', function () {
         return initState()
-          .then(createRecord({ map: {e: 2, j: 10, f: 15, a: 17} }))
+          .then(createRecord({ map: { e: 2, j: 10, f: 15, a: 17 } }))
           .then(orderByKeyValue('map'))
           .then(operate(maps.removeByValueRelRankRange('map', 11, 1, 1).andReturn(maps.returnType.KEY)))
           .then(assertResultEql({ map: ['a'] }))
-          .then(assertRecordEql({ map: {e: 2, j: 10, f: 15} }))
+          .then(assertRecordEql({ map: { e: 2, j: 10, f: 15 } }))
           .then(cleanup())
       })
     })
@@ -653,11 +726,27 @@ describe('client.operate() - CDT Map operations', function () {
     context('without count', function () {
       it('removes map entries nearest to value and greater by relative rank', function () {
         return initState()
-          .then(createRecord({ map: {e: 2, j: 10, f: 15, a: 17} }))
+          .then(createRecord({ map: { e: 2, j: 10, f: 15, a: 17 } }))
           .then(orderByKeyValue('map'))
           .then(operate(maps.removeByValueRelRankRange('map', 11, -1).andReturn(maps.returnType.KEY)))
           .then(assertResultEql({ map: ['j', 'f', 'a'] }))
-          .then(assertRecordEql({ map: {e: 2} }))
+          .then(assertRecordEql({ map: { e: 2 } }))
+          .then(cleanup())
+      })
+    })
+
+    context('with nested map context', function () {
+      helper.skipUnlessVersion('>= 4.6.0', this)
+
+      it('removes map entries nearest to value and greater by relative rank', function () {
+        const mapContext = new Context()
+          .addListIndex(2)
+          .addListIndex(1)
+        return initState()
+          .then(createRecord({ list: ['a', 'b', ['c', { e: 2, j: 10, f: 15, a: 17 }], 'd', 'e'] }))
+          .then(orderByKeyValue('list', mapContext))
+          .then(operate(maps.removeByValueRelRankRange('list', 11, 1, 1).withContext(mapContext)))
+          .then(assertRecordEql({ list: ['a', 'b', ['c', { e: 2, j: 10, f: 15 }], 'd', 'e'] }))
           .then(cleanup())
       })
     })
@@ -666,78 +755,126 @@ describe('client.operate() - CDT Map operations', function () {
   describe('maps.removeByIndex', function () {
     it('removes a map entry identified by index', function () {
       return initState()
-        .then(createRecord({ map: {a: 1, b: 2, c: 3} }))
+        .then(createRecord({ map: { a: 1, b: 2, c: 3 } }))
         .then(operate(maps.removeByIndex('map', 1, maps.returnType.KEY)))
         .then(assertResultEql({ map: 'b' }))
-        .then(assertRecordEql({ map: {a: 1, c: 3} }))
+        .then(assertRecordEql({ map: { a: 1, c: 3 } }))
         .then(cleanup())
+    })
+
+    context('with nested map context', function () {
+      helper.skipUnlessVersion('>= 4.6.0', this)
+
+      it('removes a map entry identified by index', function () {
+        return initState()
+          .then(createRecord({ map: { nested: { a: 1, b: 2, c: 3 } } }))
+          .then(operate(maps.removeByIndex('map', 1).withContext(ctx => ctx.addMapValue({ a: 1, b: 2, c: 3 }))))
+          .then(assertRecordEql({ map: { nested: { a: 1, c: 3 } } }))
+          .then(cleanup())
+      })
     })
   })
 
   describe('maps.removeByIndexRange', function () {
     it('removes map entries identified by index range', function () {
       return initState()
-        .then(createRecord({ map: {a: 1, b: 2, c: 2, d: 3} }))
+        .then(createRecord({ map: { a: 1, b: 2, c: 2, d: 3 } }))
         .then(operate(maps.removeByIndexRange('map', 1, 2, maps.returnType.KEY)))
         .then(assertResultEql({ map: ['b', 'c'] }))
-        .then(assertRecordEql({ map: {a: 1, d: 3} }))
+        .then(assertRecordEql({ map: { a: 1, d: 3 } }))
         .then(cleanup())
     })
 
     it('removes all map entries starting at the specified index if count is null', function () {
       return initState()
-        .then(createRecord({ map: {a: 1, b: 2, c: 3} }))
+        .then(createRecord({ map: { a: 1, b: 2, c: 3 } }))
         .then(operate(maps.removeByIndexRange('map', 1, null, maps.returnType.KEY)))
         .then(assertResultEql({ map: ['b', 'c'] }))
-        .then(assertRecordEql({ map: {a: 1} }))
+        .then(assertRecordEql({ map: { a: 1 } }))
         .then(cleanup())
     })
 
     it('removes all map entries starting at the specified index if count is undefined', function () {
       return initState()
-        .then(createRecord({ map: {a: 1, b: 2, c: 3} }))
+        .then(createRecord({ map: { a: 1, b: 2, c: 3 } }))
         .then(operate(maps.removeByIndexRange('map', 1)))
         .then(assertResultEql({ map: null }))
-        .then(assertRecordEql({ map: {a: 1} }))
+        .then(assertRecordEql({ map: { a: 1 } }))
         .then(cleanup())
+    })
+
+    context('with nested map context', function () {
+      helper.skipUnlessVersion('>= 4.6.0', this)
+
+      it('removes map entries identified by index range', function () {
+        return initState()
+          .then(createRecord({ map: { nested: { a: 1, b: 2, c: 2, d: 3 } } }))
+          .then(operate(maps.removeByIndexRange('map', 1, 2).withContext(ctx => ctx.addMapKey('nested'))))
+          .then(assertRecordEql({ map: { nested: { a: 1, d: 3 } } }))
+          .then(cleanup())
+      })
     })
   })
 
   describe('maps.removeByRank', function () {
     it('removes a map entry identified by rank', function () {
       return initState()
-        .then(createRecord({ map: {a: 3, b: 2, c: 1} }))
+        .then(createRecord({ map: { a: 3, b: 2, c: 1 } }))
         .then(operate(maps.removeByRank('map', 0, maps.returnType.VALUE)))
         .then(assertResultEql({ map: 1 }))
-        .then(assertRecordEql({ map: {a: 3, b: 2} }))
+        .then(assertRecordEql({ map: { a: 3, b: 2 } }))
         .then(cleanup())
+    })
+
+    context('with nested map context', function () {
+      helper.skipUnlessVersion('>= 4.6.0', this)
+
+      it('removes a map entry identified by rank', function () {
+        return initState()
+          .then(createRecord({ list: [{ a: 3, b: 2, c: 1 }] }))
+          .then(operate(maps.removeByRank('list', 0).withContext(ctx => ctx.addListIndex(0))))
+          .then(assertRecordEql({ list: [{ a: 3, b: 2 }] }))
+          .then(cleanup())
+      })
     })
   })
 
   describe('maps.removeByRankRange', function () {
     it('removes map entries identified by rank range', function () {
       return initState()
-        .then(createRecord({ map: {a: 3, b: 2, c: 1} }))
+        .then(createRecord({ map: { a: 3, b: 2, c: 1 } }))
         .then(operate(maps.removeByRankRange('map', 0, 2, maps.returnType.VALUE)))
         .then(assertResultEql({ map: [1, 2] }))
-        .then(assertRecordEql({ map: {a: 3} }))
+        .then(assertRecordEql({ map: { a: 3 } }))
         .then(cleanup())
     })
 
     it('removes all map entries starting at the specified rank until the end', function () {
       return initState()
-        .then(createRecord({ map: {a: 3, b: 2, c: 1} }))
+        .then(createRecord({ map: { a: 3, b: 2, c: 1 } }))
         .then(operate(maps.removeByRankRange('map', 1, null, maps.returnType.VALUE)))
         .then(assertResultEql({ map: [2, 3] }))
-        .then(assertRecordEql({ map: {c: 1} }))
+        .then(assertRecordEql({ map: { c: 1 } }))
         .then(cleanup())
+    })
+
+    context('with nested map context', function () {
+      helper.skipUnlessVersion('>= 4.6.0', this)
+
+      it('removes map entries identified by rank range', function () {
+        return initState()
+          .then(createRecord({ list: [{ a: 3, b: 2, c: 1 }] }))
+          .then(operate(maps.removeByRankRange('list', 0, 2).withContext(ctx => ctx.addListIndex(-1))))
+          .then(assertRecordEql({ list: [{ a: 3 }] }))
+          .then(cleanup())
+      })
     })
   })
 
   describe('maps.size', function () {
     it('returns the size of the map', function () {
       return initState()
-        .then(createRecord({ map: {a: 1, b: 2, c: 3} }))
+        .then(createRecord({ map: { a: 1, b: 2, c: 3 } }))
         .then(operate(maps.size('map')))
         .then(assertResultEql({ map: 3 }))
         .then(cleanup())
@@ -758,12 +895,24 @@ describe('client.operate() - CDT Map operations', function () {
         .then(assertResultEql({ map: null }))
         .then(cleanup())
     })
+
+    context('with nested map context', function () {
+      helper.skipUnlessVersion('>= 4.6.0', this)
+
+      it('returns the size of the map', function () {
+        return initState()
+          .then(createRecord({ map: { nested: { a: 1, b: 2, c: 3 } } }))
+          .then(operate(maps.size('map').withContext(ctx => ctx.addMapKey('nested'))))
+          .then(assertResultEql({ map: 3 }))
+          .then(cleanup())
+      })
+    })
   })
 
   describe('maps.getByKey', function () {
     it('fetches a map entry identified by key', function () {
       return initState()
-        .then(createRecord({ map: {a: 1, b: 2, c: 3} }))
+        .then(createRecord({ map: { a: 1, b: 2, c: 3 } }))
         .then(operate(maps.getByKey('map', 'b', maps.returnType.KEY_VALUE)))
         .then(assertResultEql({ map: ['b', 2] }))
         .then(cleanup())
@@ -771,17 +920,34 @@ describe('client.operate() - CDT Map operations', function () {
 
     it('does not fail if the key does not exist', function () {
       return initState()
-        .then(createRecord({ map: {a: 1, b: 2, c: 3} }))
+        .then(createRecord({ map: { a: 1, b: 2, c: 3 } }))
         .then(operate(maps.getByKey('map', 'z', maps.returnType.KEY_VALUE)))
         .then(assertResultEql({ map: [] }))
         .then(cleanup())
+    })
+
+    context('with nested map context', function () {
+      helper.skipUnlessVersion('>= 4.6.0', this)
+
+      it('fetches a map entry identified by key', function () {
+        return initState()
+          .then(createRecord({ list: [{ a: 1, b: 2, c: 3 }, { b: 3 }] }))
+          .then(operate(
+            maps
+              .getByKey('list', 'b')
+              .withContext(ctx => ctx.addListIndex(0))
+              .andReturn(maps.returnType.KEY_VALUE)
+          ))
+          .then(assertResultEql({ list: ['b', 2] }))
+          .then(cleanup())
+      })
     })
   })
 
   describe('maps.getByKeyRange', function () {
     it('fetches map entries identified by key range', function () {
       return initState()
-        .then(createRecord({ map: {a: 1, b: 2, c: 3, d: 4} }))
+        .then(createRecord({ map: { a: 1, b: 2, c: 3, d: 4 } }))
         .then(orderByKey('map'))
         .then(operate(maps.getByKeyRange('map', 'b', 'd', maps.returnType.KEY)))
         .then(assertResultEql({ map: ['b', 'c'] }))
@@ -790,7 +956,7 @@ describe('client.operate() - CDT Map operations', function () {
 
     it('fetches all keys from the specified start key until the end', function () {
       return initState()
-        .then(createRecord({ map: {a: 1, b: 2, c: 3, d: 4} }))
+        .then(createRecord({ map: { a: 1, b: 2, c: 3, d: 4 } }))
         .then(orderByKey('map'))
         .then(operate(maps.getByKeyRange('map', 'b', null, maps.returnType.KEY)))
         .then(assertResultEql({ map: ['b', 'c', 'd'] }))
@@ -799,20 +965,39 @@ describe('client.operate() - CDT Map operations', function () {
 
     it('fetches all keys from the start to the specified end', function () {
       return initState()
-        .then(createRecord({ map: {a: 1, b: 2, c: 3} }))
+        .then(createRecord({ map: { a: 1, b: 2, c: 3 } }))
         .then(operate(maps.getByKeyRange('map', null, 'b', maps.returnType.KEY)))
         .then(assertResultEql({ map: ['a'] }))
         .then(cleanup())
     })
+
+    context('with nested map context', function () {
+      helper.skipUnlessVersion('>= 4.6.0', this)
+
+      it('fetches map entries identified by key range', function () {
+        const mapContext = new Context().addListIndex(-1)
+        return initState()
+          .then(createRecord({ list: [{ b: 3, c: 4 }, { a: 1, b: 2, c: 3, d: 4 }] }))
+          .then(orderByKey('list', mapContext))
+          .then(operate(
+            maps
+              .getByKeyRange('list', 'b', 'd')
+              .withContext(mapContext)
+              .andReturn(maps.returnType.KEY)
+          ))
+          .then(assertResultEql({ list: ['b', 'c'] }))
+          .then(cleanup())
+      })
+    })
   })
 
   describe('maps.getByKeyRelIndexRange', function () {
-    helper.cluster.skip_unless_version('4.3.0', this)
+    helper.skipUnlessVersion('>= 4.3.0', this)
 
     context('with count', function () {
       it('retrieves map entries nearest to key and greater, by index', function () {
         return initState()
-          .then(createRecord({ map: {a: 17, e: 2, f: 15, j: 10} }))
+          .then(createRecord({ map: { a: 17, e: 2, f: 15, j: 10 } }))
           .then(orderByKey('map'))
           .then(operate(maps.getByKeyRelIndexRange('map', 'f', 0, 1).andReturn(maps.returnType.KEY)))
           .then(assertResultEql({ map: ['f'] }))
@@ -823,10 +1008,29 @@ describe('client.operate() - CDT Map operations', function () {
     context('without count', function () {
       it('retrieves map entries nearest to key and greater, by index', function () {
         return initState()
-          .then(createRecord({ map: {a: 17, e: 2, f: 15, j: 10} }))
+          .then(createRecord({ map: { a: 17, e: 2, f: 15, j: 10 } }))
           .then(orderByKey('map'))
           .then(operate(maps.getByKeyRelIndexRange('map', 'f', 0).andReturn(maps.returnType.KEY)))
           .then(assertResultEql({ map: ['f', 'j'] }))
+          .then(cleanup())
+      })
+    })
+
+    context('with nested map context', function () {
+      helper.skipUnlessVersion('>= 4.6.0', this)
+
+      it('retrieves map entries nearest to key and greater, by index', function () {
+        const mapContext = new Context().addListIndex(-1)
+        return initState()
+          .then(createRecord({ list: [{ a: 17, e: 2, f: 15, j: 10 }] }))
+          .then(orderByKey('list', mapContext))
+          .then(operate(
+            maps
+              .getByKeyRelIndexRange('list', 'f', 0)
+              .withContext(mapContext)
+              .andReturn(maps.returnType.KEY)
+          ))
+          .then(assertResultEql({ list: ['f', 'j'] }))
           .then(cleanup())
       })
     })
@@ -835,17 +1039,34 @@ describe('client.operate() - CDT Map operations', function () {
   describe('maps.getByValue', function () {
     it('fetches a map entry identified by value', function () {
       return initState()
-        .then(createRecord({ map: {a: 1, b: 2, c: 3} }))
+        .then(createRecord({ map: { a: 1, b: 2, c: 3 } }))
         .then(operate(maps.getByValue('map', 2, maps.returnType.VALUE)))
         .then(assertResultEql({ map: [2] }))
         .then(cleanup())
+    })
+
+    context('with nested map context', function () {
+      helper.skipUnlessVersion('>= 4.6.0', this)
+
+      it('fetches a map entry identified by value', function () {
+        return initState()
+          .then(createRecord({ map: { nested: { a: 1, b: 2, c: 2 } } }))
+          .then(operate(
+            maps
+              .getByValue('map', 2)
+              .withContext(ctx => ctx.addMapKey('nested'))
+              .andReturn(maps.returnType.KEY)
+          ))
+          .then(assertResultSatisfy(result => eql(result.map.sort(), ['b', 'c'])))
+          .then(cleanup())
+      })
     })
   })
 
   describe('maps.getByValueRange', function () {
     it('fetches map entries identified by value range', function () {
       return initState()
-        .then(createRecord({ map: {a: 1, b: 2, c: 2, d: 3} }))
+        .then(createRecord({ map: { a: 1, b: 2, c: 2, d: 3 } }))
         .then(operate(maps.getByValueRange('map', 2, 3, maps.returnType.VALUE)))
         .then(assertResultEql({ map: [2, 2] }))
         .then(cleanup())
@@ -853,7 +1074,7 @@ describe('client.operate() - CDT Map operations', function () {
 
     it('fetches all values from the specified start value until the end', function () {
       return initState()
-        .then(createRecord({ map: {a: 1, b: 2, c: 3} }))
+        .then(createRecord({ map: { a: 1, b: 2, c: 3 } }))
         .then(operate(maps.getByValueRange('map', 2, null, maps.returnType.VALUE)))
         .then(assertResultSatisfy(result => eql(result.map.sort(), [2, 3])))
         .then(cleanup())
@@ -861,20 +1082,37 @@ describe('client.operate() - CDT Map operations', function () {
 
     it('fetches all values from the start to the specified end', function () {
       return initState()
-        .then(createRecord({ map: {a: 1, b: 2, c: 3} }))
+        .then(createRecord({ map: { a: 1, b: 2, c: 3 } }))
         .then(operate(maps.getByValueRange('map', null, 2, maps.returnType.VALUE)))
         .then(assertResultEql({ map: [1] }))
         .then(cleanup())
     })
+
+    context('with nested map context', function () {
+      helper.skipUnlessVersion('>= 4.6.0', this)
+
+      it('fetches map entries identified by value range', function () {
+        return initState()
+          .then(createRecord({ list: [{ a: 2, b: 3, c: 4 }, { a: 1, b: 2, c: 2, d: 3 }] }))
+          .then(operate(
+            maps
+              .getByValueRange('list', 2, 3)
+              .withContext(ctx => ctx.addListIndex(1))
+              .andReturn(maps.returnType.VALUE)
+          ))
+          .then(assertResultEql({ list: [2, 2] }))
+          .then(cleanup())
+      })
+    })
   })
 
   describe('maps.getByValueRelRankRange', function () {
-    helper.cluster.skip_unless_version('4.3.0', this)
+    helper.skipUnlessVersion('>= 4.3.0', this)
 
     context('with count', function () {
       it('retrieves map entries nearest to value and greater by relative rank', function () {
         return initState()
-          .then(createRecord({ map: {e: 2, j: 10, f: 15, a: 17} }))
+          .then(createRecord({ map: { e: 2, j: 10, f: 15, a: 17 } }))
           .then(orderByKeyValue('map'))
           .then(operate(maps.getByValueRelRankRange('map', 11, 1, 1).andReturn(maps.returnType.KEY)))
           .then(assertResultEql({ map: ['a'] }))
@@ -885,10 +1123,29 @@ describe('client.operate() - CDT Map operations', function () {
     context('without count', function () {
       it('retrieves map entries nearest to value and greater by relative rank', function () {
         return initState()
-          .then(createRecord({ map: {e: 2, j: 10, f: 15, a: 17} }))
+          .then(createRecord({ map: { e: 2, j: 10, f: 15, a: 17 } }))
           .then(orderByKeyValue('map'))
           .then(operate(maps.getByValueRelRankRange('map', 11, -1).andReturn(maps.returnType.KEY)))
           .then(assertResultEql({ map: ['j', 'f', 'a'] }))
+          .then(cleanup())
+      })
+    })
+
+    context('with nested map context', function () {
+      helper.skipUnlessVersion('>= 4.6.0', this)
+
+      it('retrieves map entries nearest to value and greater by relative rank', function () {
+        const mapContext = new Context().addMapKey('nested')
+        return initState()
+          .then(createRecord({ map: { nested: { e: 2, j: 10, f: 15, a: 17 } } }))
+          .then(orderByKeyValue('map', mapContext))
+          .then(operate(
+            maps
+              .getByValueRelRankRange('map', 11, 1, 1)
+              .withContext(mapContext)
+              .andReturn(maps.returnType.KEY)
+          ))
+          .then(assertResultEql({ map: ['a'] }))
           .then(cleanup())
       })
     })
@@ -897,7 +1154,7 @@ describe('client.operate() - CDT Map operations', function () {
   describe('maps.getByIndex', function () {
     it('fetches a map entry identified by index', function () {
       return initState()
-        .then(createRecord({ map: {a: 1, b: 2, c: 3} }))
+        .then(createRecord({ map: { a: 1, b: 2, c: 3 } }))
         .then(operate(maps.getByIndex('map', 1, maps.returnType.KEY_VALUE)))
         .then(assertResultEql({ map: ['b', 2] }))
         .then(cleanup())
@@ -905,17 +1162,34 @@ describe('client.operate() - CDT Map operations', function () {
 
     it('fetches a map entry identified by negative index', function () {
       return initState()
-        .then(createRecord({ map: {a: 1, b: 2, c: 3} }))
+        .then(createRecord({ map: { a: 1, b: 2, c: 3 } }))
         .then(operate(maps.getByIndex('map', -1, maps.returnType.KEY_VALUE)))
         .then(assertResultEql({ map: ['c', 3] }))
         .then(cleanup())
+    })
+
+    context('with nested map context', function () {
+      helper.skipUnlessVersion('>= 4.6.0', this)
+
+      it('fetches a map entry identified by index', function () {
+        return initState()
+          .then(createRecord({ list: [1, 2, 3, 4, { a: 1, b: 2, c: 3 }] }))
+          .then(operate(
+            maps
+              .getByIndex('list', 1)
+              .withContext(ctx => ctx.addListIndex(4))
+              .andReturn(maps.returnType.KEY_VALUE)
+          ))
+          .then(assertResultEql({ list: ['b', 2] }))
+          .then(cleanup())
+      })
     })
   })
 
   describe('maps.getByIndexRange', function () {
     it('fetches map entries identified by index range', function () {
       return initState()
-        .then(createRecord({ map: {a: 1, b: 2, c: 2, d: 3} }))
+        .then(createRecord({ map: { a: 1, b: 2, c: 2, d: 3 } }))
         .then(operate(maps.getByIndexRange('map', 1, 2, maps.returnType.KEY_VALUE)))
         .then(assertResultEql({ map: ['b', 2, 'c', 2] }))
         .then(cleanup())
@@ -923,7 +1197,7 @@ describe('client.operate() - CDT Map operations', function () {
 
     it('fetches map entries identified by negative index range', function () {
       return initState()
-        .then(createRecord({ map: {a: 1, b: 2, c: 2, d: 3} }))
+        .then(createRecord({ map: { a: 1, b: 2, c: 2, d: 3 } }))
         .then(operate(maps.getByIndexRange('map', -2, 2, maps.returnType.KEY_VALUE)))
         .then(assertResultEql({ map: ['c', 2, 'd', 3] }))
         .then(cleanup())
@@ -931,17 +1205,34 @@ describe('client.operate() - CDT Map operations', function () {
 
     it('fetches all map entries starting from the specified index until the end', function () {
       return initState()
-        .then(createRecord({ map: {a: 1, b: 2, c: 3} }))
+        .then(createRecord({ map: { a: 1, b: 2, c: 3 } }))
         .then(operate(maps.getByIndexRange('map', 1, null, maps.returnType.KEY_VALUE)))
         .then(assertResultEql({ map: ['b', 2, 'c', 3] }))
         .then(cleanup())
+    })
+
+    context('with nested map context', function () {
+      helper.skipUnlessVersion('>= 4.6.0', this)
+
+      it('fetches map entries identified by index range', function () {
+        return initState()
+          .then(createRecord({ list: [{ a: 1, b: 2, c: 2, d: 3 }] }))
+          .then(operate(
+            maps
+              .getByIndexRange('list', 1, 2)
+              .withContext(ctx => ctx.addListIndex(0))
+              .andReturn(maps.returnType.KEY_VALUE)
+          ))
+          .then(assertResultEql({ list: ['b', 2, 'c', 2] }))
+          .then(cleanup())
+      })
     })
   })
 
   describe('maps.getByRank', function () {
     it('fetches a map entry identified by rank', function () {
       return initState()
-        .then(createRecord({ map: {a: 3, b: 2, c: 1} }))
+        .then(createRecord({ map: { a: 3, b: 2, c: 1 } }))
         .then(operate(maps.getByRank('map', 0, maps.returnType.VALUE)))
         .then(assertResultEql({ map: 1 }))
         .then(cleanup())
@@ -949,17 +1240,34 @@ describe('client.operate() - CDT Map operations', function () {
 
     it('fetches a map entry identified by negative rank', function () {
       return initState()
-        .then(createRecord({ map: {a: 3, b: 2, c: 1} }))
+        .then(createRecord({ map: { a: 3, b: 2, c: 1 } }))
         .then(operate(maps.getByRank('map', -1, maps.returnType.VALUE)))
         .then(assertResultEql({ map: 3 }))
         .then(cleanup())
+    })
+
+    context('with nested map context', function () {
+      helper.skipUnlessVersion('>= 4.6.0', this)
+
+      it('fetches a map entry identified by rank', function () {
+        return initState()
+          .then(createRecord({ map: { nested: { a: 3, b: 2, c: 1 } } }))
+          .then(operate(
+            maps
+              .getByRank('map', 0)
+              .withContext(ctx => ctx.addMapKey('nested'))
+              .andReturn(maps.returnType.VALUE)
+          ))
+          .then(assertResultEql({ map: 1 }))
+          .then(cleanup())
+      })
     })
   })
 
   describe('maps.getByRankRange', function () {
     it('fetches map entries identified by rank range', function () {
       return initState()
-        .then(createRecord({ map: {a: 3, b: 2, c: 1} }))
+        .then(createRecord({ map: { a: 3, b: 2, c: 1 } }))
         .then(operate(maps.getByRankRange('map', 0, 2, maps.returnType.VALUE)))
         .then(assertResultEql({ map: [1, 2] }))
         .then(cleanup())
@@ -967,7 +1275,7 @@ describe('client.operate() - CDT Map operations', function () {
 
     it('fetches map entries identified by negative rank range', function () {
       return initState()
-        .then(createRecord({ map: {a: 3, b: 2, c: 1} }))
+        .then(createRecord({ map: { a: 3, b: 2, c: 1 } }))
         .then(operate(maps.getByRankRange('map', -2, 2, maps.returnType.VALUE)))
         .then(assertResultEql({ map: [2, 3] }))
         .then(cleanup())
@@ -975,10 +1283,27 @@ describe('client.operate() - CDT Map operations', function () {
 
     it('fetches all map entries starting at the specified rank until the end', function () {
       return initState()
-        .then(createRecord({ map: {a: 3, b: 2, c: 1} }))
+        .then(createRecord({ map: { a: 3, b: 2, c: 1 } }))
         .then(operate(maps.getByRankRange('map', 1, null, maps.returnType.VALUE)))
         .then(assertResultEql({ map: [2, 3] }))
         .then(cleanup())
+    })
+
+    context('with nested map context', function () {
+      helper.skipUnlessVersion('>= 4.6.0', this)
+
+      it('fetches map entries identified by rank range', function () {
+        return initState()
+          .then(createRecord({ list: [{ a: 3, b: 2, c: 1 }] }))
+          .then(operate(
+            maps
+              .getByRankRange('list', 0, 2)
+              .withContext(ctx => ctx.addListIndex(0))
+              .andReturn(maps.returnType.VALUE)
+          ))
+          .then(assertResultEql({ list: [1, 2] }))
+          .then(cleanup())
+      })
     })
   })
 
@@ -1051,7 +1376,7 @@ describe('client.operate() - CDT Map operations', function () {
         .then(createRecord({ map: { a: 1, b: 2, c: 3 } }))
         .then(orderByKey('map'))
         .then(operate(maps.getByIndexRange('map', 0, 2, maps.returnType.KEY)))
-        .then(assertResultEql({ map: [ 'a', 'b' ] }))
+        .then(assertResultEql({ map: ['a', 'b'] }))
         .then(cleanup())
     })
 
@@ -1069,7 +1394,7 @@ describe('client.operate() - CDT Map operations', function () {
         .then(createRecord({ map: { a: 1, b: 2, c: 3 } }))
         .then(orderByKey('map'))
         .then(operate(maps.getByIndexRange('map', 0, 2, maps.returnType.VALUE)))
-        .then(assertResultEql({ map: [ 1, 2 ] }))
+        .then(assertResultEql({ map: [1, 2] }))
         .then(cleanup())
     })
 
@@ -1078,7 +1403,7 @@ describe('client.operate() - CDT Map operations', function () {
         .then(createRecord({ map: { a: 1, b: 2, c: 3 } }))
         .then(orderByKey('map'))
         .then(operate(maps.getByIndex('map', 0, maps.returnType.KEY_VALUE)))
-        .then(assertResultEql({ map: [ 'a', 1 ] }))
+        .then(assertResultEql({ map: ['a', 1] }))
         .then(cleanup())
     })
 
@@ -1087,7 +1412,7 @@ describe('client.operate() - CDT Map operations', function () {
         .then(createRecord({ map: { a: 1, b: 2, c: 3 } }))
         .then(orderByKey('map'))
         .then(operate(maps.getByIndexRange('map', 0, 2, maps.returnType.KEY_VALUE)))
-        .then(assertResultEql({ map: [ 'a', 1, 'b', 2 ] }))
+        .then(assertResultEql({ map: ['a', 1, 'b', 2] }))
         .then(cleanup())
     })
   })

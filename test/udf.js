@@ -1,5 +1,5 @@
 // *****************************************************************************
-// Copyright 2013-2017 Aerospike, Inc.
+// Copyright 2013-2019 Aerospike, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License")
 // you may not use this file except in compliance with the License.
@@ -55,7 +55,7 @@ context('registering/unregistering UDF modules', function () {
   })
 
   it('should register a module with an info policy', function (done) {
-    let policy = new Aerospike.InfoPolicy({
+    const policy = new Aerospike.InfoPolicy({
       timeout: 1000,
       sendAsIs: true,
       checkBounds: false
@@ -74,7 +74,7 @@ context('registering/unregistering UDF modules', function () {
   })
 
   it('should register a module as Lua language with an info policy', function (done) {
-    let policy = new Aerospike.InfoPolicy({
+    const policy = new Aerospike.InfoPolicy({
       timeout: 1000,
       sendAsIs: true,
       checkBounds: false
@@ -114,10 +114,24 @@ context('registering/unregistering UDF modules', function () {
       })
     })
 
-    it('should fail to remove a non-existent module', function (done) {
-      client.udfRemove('no-such-udf.lua', function (err) {
-        expect(err.code).to.equal(Aerospike.status.ERR_UDF)
-        done()
+    context('removing a non-existent module', function () {
+      context('server version 4.5.1 and later', function () {
+        helper.skipUnlessVersion('>= 4.5.1', this)
+
+        it('should not fail when removing a non-existent module', function () {
+          return client.udfRemove('no-such-udf.lua').then(job => job.waitUntilDone())
+        })
+      })
+
+      context('server version 4.5.0 and earlier', function () {
+        helper.skipUnlessVersion('< 4.5.1', this)
+
+        it('should return an error when removing a non-existent module', function (done) {
+          client.udfRemove('no-such-udf.lua', function (error) {
+            expect(error).to.exist().and.have.property('code', Aerospike.status.ERR_UDF)
+            done()
+          })
+        })
       })
     })
   })

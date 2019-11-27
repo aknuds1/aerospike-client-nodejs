@@ -1,5 +1,5 @@
 // *****************************************************************************
-// Copyright 2013-2017 Aerospike, Inc.
+// Copyright 2013-2019 Aerospike, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License")
 // you may not use this file except in compliance with the License.
@@ -71,10 +71,10 @@ var logger = new (winston.Logger)({
 // Aerospike Client
 // *****************************************************************************
 
-let defaultPolicy = {
+const defaultPolicy = {
   totalTimeout: argv.timeout
 }
-let config = {
+const config = {
   policies: {
     read: defaultPolicy,
     write: defaultPolicy
@@ -88,7 +88,7 @@ let config = {
 }
 
 if (argv.host) {
-  config.hosts = [{addr: argv.host, port: argv.port || 3000}]
+  config.hosts = [{ addr: argv.host, port: argv.port || 3000 }]
 }
 
 if (argv.user !== null) {
@@ -161,15 +161,15 @@ function recordgen (key, binSpec) {
 }
 
 function get (key, done) {
-  let timeStart = process.hrtime()
+  const timeStart = process.hrtime()
   client.get(key, function (error) {
-    let status = (error && error.code) || 0
+    const status = (error && error.code) || 0
     done(status, process.hrtime(timeStart), READ)
   })
 }
 
 function getPromise (key, done) {
-  let timeStart = process.hrtime()
+  const timeStart = process.hrtime()
   client.get(key)
     .then(() => done(0, process.hrtime(timeStart), READ))
     .catch((err) => done(err.code, process.hrtime(timeStart), READ))
@@ -181,15 +181,15 @@ var metadata = {
 }
 
 function put (options, done) {
-  let timeStart = process.hrtime()
+  const timeStart = process.hrtime()
   client.put(options.key, options.record, metadata, function (error) {
-    let status = (error && error.code) || 0
+    const status = (error && error.code) || 0
     done(status, process.hrtime(timeStart), WRITE)
   })
 }
 
 function putPromise (options, done) {
-  let timeStart = process.hrtime()
+  const timeStart = process.hrtime()
   client.put(options.key, options.record, metadata)
     .then(() => done(0, process.hrtime(timeStart), WRITE))
     .catch((err) => done(err.code, process.hrtime(timeStart), WRITE))
@@ -233,9 +233,9 @@ function run (options) {
 
   while (writeOps > 0 || readOps > 0) {
     var k = keygen(options.keyRange.min, options.keyRange.max)
-    var key = {ns: options.namespace, set: options.set, key: k}
+    var key = { ns: options.namespace, set: options.set, key: k }
     var record = recordgen(k, options.binSpec)
-    var ops = {key: key, record: record}
+    var ops = { key: key, record: record }
     if (writeOps > 0) {
       writeOps--
       if (usePromises) {

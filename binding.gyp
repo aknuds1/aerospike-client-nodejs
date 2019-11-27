@@ -49,7 +49,9 @@
         'src/main/client.cc',
         'src/main/config.cc',
         'src/main/events.cc',
+        'src/main/cdt_ctx.cc',
         'src/main/operations.cc',
+        'src/main/bit_operations.cc',
         'src/main/policy.cc',
         'src/main/query.cc',
         'src/main/scan.cc',
@@ -63,8 +65,10 @@
         'src/main/commands/batch_read_async.cc',
         'src/main/commands/exists_async.cc',
         'src/main/commands/get_async.cc',
-        'src/main/commands/info.cc',
+        'src/main/commands/info_any.cc',
         'src/main/commands/info_foreach.cc',
+        'src/main/commands/info_host.cc',
+        'src/main/commands/info_node.cc',
         'src/main/commands/job_info.cc',
         'src/main/commands/operate_async.cc',
         'src/main/commands/put_async.cc',
@@ -82,6 +86,7 @@
         'src/main/commands/udf_register.cc',
         'src/main/commands/udf_remove.cc',
         'src/main/enums/predicates.cc',
+        'src/main/enums/bitwise_enum.cc',
         'src/main/enums/maps.cc',
         'src/main/enums/lists.cc',
         'src/main/enums/index.cc',
@@ -92,6 +97,7 @@
         'src/main/enums/udf_languages.cc',
         'src/main/enums/ttl.cc',
         'src/main/enums/config_enum.cc',
+        'src/main/stats.cc',
         'src/main/util/conversions.cc',
         'src/main/util/log.cc'
       ],
@@ -103,7 +109,7 @@
       'configurations': {
         'Release': {
             "cflags": [
-              "-Wno-deprecated-declarations",
+              "-Wno-deprecated-declarations -Wno-cast-function-type",
             ],
             "xcode_settings": {
               "OTHER_CFLAGS": [

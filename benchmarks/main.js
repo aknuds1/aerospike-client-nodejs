@@ -1,5 +1,5 @@
 // *****************************************************************************
-// Copyright 2013-2017 Aerospike, Inc.
+// Copyright 2013-2019 Aerospike, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License")
 // you may not use this file except in compliance with the License.
@@ -77,7 +77,7 @@ if (argv.time !== undefined) {
   argv.iterations = undefined
 }
 
-var alert = {mode: argv.alert, filename: argv.filename}
+var alert = { mode: argv.alert, filename: argv.filename }
 alerts.setupAlertSystem(alert)
 
 // *****************************************************************************
@@ -186,10 +186,10 @@ function workerResultsInterval (worker, intervalWorkerStats) {
   }
   if (++counter % argv.processes === 0) {
     stats.interval({
-      'read': intervalStats[0],
-      'write': intervalStats[1],
-      'query': intervalStats[2],
-      'scan': intervalStats[3]
+      read: intervalStats[0],
+      write: intervalStats[1],
+      query: intervalStats[2],
+      scan: intervalStats[3]
     })
     if (!argv.silent) {
       printIntervalStats()

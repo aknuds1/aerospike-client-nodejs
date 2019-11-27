@@ -1,5 +1,5 @@
 // *****************************************************************************
-// Copyright 2013-2017 Aerospike, Inc.
+// Copyright 2013-2019 Aerospike, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License")
 // you may not use this file except in compliance with the License.
@@ -39,29 +39,29 @@ var startTime
 var totalDuration
 
 const TABLE_CHARS = {
-  'top': '',
+  top: '',
   'top-mid': '',
   'top-left': '',
   'top-right': '',
-  'bottom': '',
+  bottom: '',
   'bottom-mid': '',
   'bottom-left': '',
   'bottom-right': '',
-  'left': '',
+  left: '',
   'left-mid': '',
-  'mid': '',
+  mid: '',
   'mid-mid': '',
-  'right': '',
+  right: '',
   'right-mid': '',
-  'middle': ''
+  middle: ''
 }
 
 const TABLE_STYLE = {
   'padding-left': 4,
   'padding-right': 0,
-  'head': ['blue'],
-  'border': ['grey'],
-  'compact': true
+  head: ['blue'],
+  border: ['grey'],
+  compact: true
 }
 
 function sum (l, r) {
@@ -96,7 +96,7 @@ function parseTimeToSecs (time) {
 function timeHistogram (operations) {
   operations
     .map(op => {
-      let elapsed = op[OPERATION_TIME_DIFF]
+      const elapsed = op[OPERATION_TIME_DIFF]
       return Math.floor(duration(elapsed))
     })
     .forEach(d => {
@@ -139,10 +139,11 @@ function timeUnits (v) {
 }
 
 function calculateTPS (transactions) {
-  var seconds = totalDuration / 1000
-  Object.keys(transactions).forEach(function (stat) {
-    transactions[stat]['tps'] = transactions[stat]['count'] / seconds
-  })
+  const seconds = totalDuration / 1000
+  for (const key in transactions) {
+    const stat = transactions[key]
+    stat.tps = stat.count / seconds
+  }
 }
 
 function statusHistogram (operations) {
@@ -167,8 +168,8 @@ function printEnvTable (print, prefix) {
     style: TABLE_STYLE
   })
 
-  envTable.push({'Node.js Version': process.versions.node})
-  envTable.push({'UV_THREADPOOL_SIZE': process.env.UV_THREADPOOL_SIZE || '-'})
+  envTable.push({ 'Node.js Version': process.versions.node })
+  envTable.push({ UV_THREADPOOL_SIZE: process.env.UV_THREADPOOL_SIZE || '-' })
 
   printTable(envTable, print, prefix)
 }
@@ -179,11 +180,11 @@ function printConfigTable (config, print, prefix) {
     style: TABLE_STYLE
   })
 
-  configTable.push({'operations': config.operations})
-  configTable.push({'iterations': config.iterations === undefined ? 'undefined' : config.iterations})
-  configTable.push({'processes': config.processes})
-  configTable.push({'promises': !!config.promises})
-  configTable.push({'time': config.time === undefined ? 'undefined' : timeUnits(config.time)})
+  configTable.push({ operations: config.operations })
+  configTable.push({ iterations: config.iterations === undefined ? 'undefined' : config.iterations })
+  configTable.push({ processes: config.processes })
+  configTable.push({ promises: !!config.promises })
+  configTable.push({ time: config.time === undefined ? 'undefined' : timeUnits(config.time) })
 
   printTable(configTable, print, prefix)
 }
@@ -200,27 +201,19 @@ function printTransactions (transactions, print, prefix) {
     chars: TABLE_CHARS,
     style: TABLE_STYLE
   })
-  var columns = Object.keys(transactions)
+  const columns = Object.keys(transactions).map(key => transactions[key])
 
-  var row = columns.map(function (col) {
-    return numberFormat(transactions[col]['count'], 0)
-  })
-  table.push({'Total': row})
+  const totals = columns.map(col => numberFormat(col.count, 0))
+  table.push({ Total: totals })
 
-  row = columns.map(function (col) {
-    return numberFormat(transactions[col]['tps'], 0)
-  })
-  table.push({'TPS': row})
+  const avgTps = columns.map(col => numberFormat(col.tps, 0))
+  table.push({ TPS: avgTps })
 
-  row = columns.map(function (col) {
-    return numberFormat(transactions[col]['min_tps'], 0)
-  })
-  table.push({'Min TPS': row})
+  const minTps = columns.map(col => numberFormat(col.min_tps, 0))
+  table.push({ 'Min TPS': minTps })
 
-  row = columns.map(function (col) {
-    return numberFormat(transactions[col]['max_tps'], 0)
-  })
-  table.push({'Max TPS': row})
+  const maxTps = columns.map(col => numberFormat(col.max_tps, 0))
+  table.push({ 'Max TPS': maxTps })
 
   printTable(table, print, prefix)
 }
@@ -254,7 +247,7 @@ function start () {
 }
 
 function stop () {
-  let elapsed = process.hrtime(startTime)
+  const elapsed = process.hrtime(startTime)
   totalDuration = duration(elapsed)
 }
 
@@ -265,9 +258,9 @@ function iteration (operations) {
 
 function aggregateIntervalStats (statName, tx) {
   var stats = trans[statName] = trans[statName] || { count: 0, max_tps: 0, min_tps: Infinity }
-  stats['count'] += tx
-  if (tx > stats['max_tps']) stats['max_tps'] = tx
-  if (tx < stats['min_tps']) stats['min_tps'] = tx
+  stats.count += tx
+  if (tx > stats.max_tps) stats.max_tps = tx
+  if (tx < stats.min_tps) stats.min_tps = tx
 }
 
 function interval (intervalStats) {
@@ -305,7 +298,7 @@ function reportFinal (argv, print) {
     var output = {
       env: {
         nodejs: process.versions.node,
-        'UV_THREADPOOL_SIZE': process.env.UV_THREADPOOL_SIZE || null
+        UV_THREADPOOL_SIZE: process.env.UV_THREADPOOL_SIZE || null
       },
       configuration: {
         operations: argv.operations,

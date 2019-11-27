@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // *****************************************************************************
-// Copyright 2013-2018 Aerospike, Inc.
+// Copyright 2013-2019 Aerospike, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License")
 // you may not use this file except in compliance with the License.
@@ -21,15 +21,15 @@ const path = require('path')
 shared.runner()
 
 async function udfRegister (client, argv) {
-  let module = argv.module
-  let job = await client.udfRegister(module)
+  const module = argv.module
+  const job = await client.udfRegister(module)
   await job.waitUntilDone()
   console.info('UDF module registered successfully')
 }
 
 async function udfRemove (client, argv) {
-  let module = path.basename(argv.module)
-  let job = await client.udfRemove(module)
+  const module = path.basename(argv.module)
+  const job = await client.udfRemove(module)
   await job.waitUntilDone()
   console.info('UDF module removed successfully')
 }

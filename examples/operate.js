@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // *****************************************************************************
-// Copyright 2013-2018 Aerospike, Inc.
+// Copyright 2013-2019 Aerospike, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License")
 // you may not use this file except in compliance with the License.
@@ -25,7 +25,7 @@ shared.runner()
 async function operate (client, argv) {
   const key = new Aerospike.Key(argv.namespace, argv.set, argv.key)
   const i = shared.random.int(1, 10)
-  let ops = [
+  const ops = [
     lists.append('values', i),
     op.read('values'),
     op.incr('sum', i),

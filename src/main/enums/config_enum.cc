@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright 2013-2018 Aerospike, Inc.
+ * Copyright 2013-2019 Aerospike, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,7 +24,7 @@ extern "C" {
 
 using namespace v8;
 
-#define set(__obj, __name, __value) __obj->Set(Nan::New(__name).ToLocalChecked(), Nan::New(__value))
+#define set(__obj, __name, __value) Nan::Set(__obj, Nan::New(__name).ToLocalChecked(), Nan::New(__value))
 
 Local<Object> log_enum_values()
 {
@@ -45,7 +45,7 @@ Local<Object> auth_mode_enum_values()
 	Nan::EscapableHandleScope scope;
 	Local<Object> obj = Nan::New<Object>();
 	set(obj, "INTERNAL", AS_AUTH_INTERNAL);
-	// set(obj, "EXTERNAL", AS_AUTH_EXTERNAL); // Not supported - requires TLS support
+	set(obj, "EXTERNAL", AS_AUTH_EXTERNAL);
 	set(obj, "EXTERNAL_INSECURE", AS_AUTH_EXTERNAL_INSECURE);
 	return scope.Escape(obj);
 }

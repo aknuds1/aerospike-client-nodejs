@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // *****************************************************************************
-// Copyright 2013-2018 Aerospike, Inc.
+// Copyright 2013-2019 Aerospike, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License")
 // you may not use this file except in compliance with the License.
@@ -30,7 +30,7 @@ async function put (client, argv) {
 }
 
 function buildMeta (argv) {
-  let meta = { }
+  const meta = { }
   if (argv.ttl) {
     meta.ttl = argv.ttl
   }
@@ -38,7 +38,7 @@ function buildMeta (argv) {
 }
 
 function buildPolicy (argv) {
-  let policy = { }
+  const policy = { }
   if (argv.create) {
     policy.exists = Aerospike.policy.exists.CREATE
   }
@@ -61,19 +61,19 @@ exports.builder = {
     group: 'Command:',
     type: 'number'
   },
-  'create': {
+  create: {
     describe: 'Create a new record',
     group: 'Command:',
     requiresArg: false,
     conflicts: ['update', 'replace']
   },
-  'replace': {
+  replace: {
     describe: 'Replace an existing record',
     group: 'Command:',
     requiresArg: false,
     conflicts: ['create', 'update']
   },
-  'update': {
+  update: {
     describe: 'Update an existing record',
     group: 'Command:',
     requiresArg: false,

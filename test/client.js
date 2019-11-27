@@ -1,5 +1,5 @@
 // *****************************************************************************
-// Copyright 2013-2018 Aerospike, Inc.
+// Copyright 2013-2019 Aerospike, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License")
 // you may not use this file except in compliance with the License.
@@ -56,7 +56,7 @@ describe('Client', function () {
 
   describe('#close', function () {
     it('should be a no-op if close is called after connection error #noserver', function (done) {
-      const client = new Client({hosts: '127.0.0.1:0'})
+      const client = new Client({ hosts: '127.0.0.1:0' })
       client.connect(error => {
         expect(error.message).to.match(/Failed to connect/)
         client.close(false)
@@ -118,6 +118,21 @@ describe('Client', function () {
     })
   })
 
+  describe('Client#getNodes', function () {
+    var client = helper.client
+
+    it('returns a list of cluster nodes', function () {
+      var nodes = client.getNodes()
+
+      expect(nodes).to.be.an('array')
+      expect(nodes.length).to.be.greaterThan(0)
+      nodes.forEach(function (node) {
+        expect(node.name).to.match(/^[0-9A-F]{15}$/)
+        expect(node.address).to.be.a('string')
+      })
+    })
+  })
+
   context('cluster name', function () {
     it('should fail to connect to the cluster if the cluster name does not match', function (done) {
       var config = Object.assign({}, helper.config)
@@ -133,7 +148,7 @@ describe('Client', function () {
 
   describe('Events', function () {
     it('client should emit nodeAdded events when connecting', function (done) {
-      let client = new Client(helper.config)
+      const client = new Client(helper.config)
       client.once('nodeAdded', event => {
         client.close()
         done()
@@ -142,7 +157,7 @@ describe('Client', function () {
     })
 
     it('client should emit events on cluster state changes', function (done) {
-      let client = new Client(helper.config)
+      const client = new Client(helper.config)
       client.once('event', event => {
         expect(event.name).to.equal('nodeAdded')
         client.close()

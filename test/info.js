@@ -1,5 +1,5 @@
 // *****************************************************************************
-// Copyright 2013-2017 Aerospike, Inc.
+// Copyright 2013-2019 Aerospike, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License")
 // you may not use this file except in compliance with the License.
@@ -21,17 +21,21 @@
 const Aerospike = require('../lib/aerospike')
 const info = require('../lib/info')
 const helper = require('./test_helper')
+const utils = require('../lib/utils')
 
 const AerospikeError = Aerospike.AerospikeError
 
 context('Info commands', function () {
-  let client = helper.client
+  const client = helper.client
 
   describe('Client#info()', function () {
+    let node = null
     let host = null
 
-    before(() => helper.cluster.randomNode()
-      .then(randomHost => { host = randomHost }))
+    before(() => {
+      node = helper.cluster.randomNode()
+      host = utils.parseHostString(node.address)
+    })
 
     it('sends status query to a specific cluster node', function (done) {
       client.info('status', host, (error, response) => {
@@ -42,8 +46,7 @@ context('Info commands', function () {
     })
 
     it('accepts a string with the host address', function (done) {
-      let hostAddress = host.addr + ':' + host.port
-      client.info('status', hostAddress, (error, response) => {
+      client.info('status', node.address, (error, response) => {
         if (error) throw error
         expect(response).to.equal('status\tok\n')
         done()
@@ -61,6 +64,34 @@ context('Info commands', function () {
 
     it('should return a client error if the client is not connected', function (done) {
       Aerospike.client(helper.config).info('status', host, error => {
+        expect(error).to.be.instanceof(AerospikeError).with.property('code', Aerospike.status.ERR_CLIENT)
+        done()
+      })
+    })
+  })
+
+  describe('Client#infoNode()', function () {
+    let node = null
+
+    before(() => {
+      node = helper.cluster.randomNode()
+    })
+
+    it('sends status query to a specific cluster node', function () {
+      return client.infoNode('status', node)
+        .then(response => expect(response).to.equal('status\tok\n'))
+    })
+
+    it('fetches all info if no request is passed', function () {
+      return client.infoNode(null, node)
+        .then(response => {
+          expect(response).to.contain('\nversion\t')
+          expect(response).to.contain('\nedition\t')
+        })
+    })
+
+    it('should return a client error if the client is not connected', function (done) {
+      Aerospike.client(helper.config).infoNode('status', node, error => {
         expect(error).to.be.instanceof(AerospikeError).with.property('code', Aerospike.status.ERR_CLIENT)
         done()
       })
@@ -119,25 +150,25 @@ context('Info commands', function () {
     it('should parse key-value pairs from an info string', function () {
       var infoStr = 'version\t1\nedition\tCommunity Edition\n'
       var infoHash = info.parse(infoStr)
-      expect(infoHash).to.eql({version: 1, edition: 'Community Edition'})
+      expect(infoHash).to.eql({ version: 1, edition: 'Community Edition' })
     })
 
     it('should parse nested key-value pairs', function () {
       var infoStr = 'statistics\tmem=10;req=20\n'
       var infoHash = info.parse(infoStr)
-      expect(infoHash['statistics']).to.eql({mem: 10, req: 20})
+      expect(infoHash.statistics).to.eql({ mem: 10, req: 20 })
     })
 
     it('should parse list values', function () {
       var infoStr = 'features\tgeo;double\n'
       var infoHash = info.parse(infoStr)
-      expect(infoHash['features']).to.eql(['geo', 'double'])
+      expect(infoHash.features).to.eql(['geo', 'double'])
     })
 
     it('should parse numeric strings as numbers', function () {
       var infoStr = 'version\t1'
       var infoHash = info.parse(infoStr)
-      expect(infoHash['version']).to.be.a('number')
+      expect(infoHash.version).to.be.a('number')
     })
 
     it('should be able to handle an empty info response', function () {
@@ -175,21 +206,21 @@ context('Info commands', function () {
     })
 
     it('should parse the bins info key', function () {
-      let infoStr = 'bins\ttest:bin_names=2,bin_names_quota=32768,bin1,bin2;'
-      let infoHash = info.parse(infoStr)
-      let expected = {
+      const infoStr = 'bins\ttest:bin_names=2,bin_names_quota=32768,bin1,bin2;'
+      const infoHash = info.parse(infoStr)
+      const expected = {
         test: {
           names: ['bin1', 'bin2'],
           stats: { bin_names: 2, bin_names_quota: 32768 }
         }
       }
-      expect(infoHash['bins']).to.deep.equal(expected)
+      expect(infoHash.bins).to.deep.equal(expected)
     })
 
     it('should pick the right separators to parse based on the key pattern', function () {
-      let infoStr = 'sets/test/foo/bar\tobjects=0:tombstones=0:truncate_lut=275452156000:disable-eviction=false;'
-      let infoHash = info.parse(infoStr)
-      let expected = {
+      const infoStr = 'sets/test/foo/bar\tobjects=0:tombstones=0:truncate_lut=275452156000:disable-eviction=false;'
+      const infoHash = info.parse(infoStr)
+      const expected = {
         objects: 0,
         tombstones: 0,
         truncate_lut: 275452156000,

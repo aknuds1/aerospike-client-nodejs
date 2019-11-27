@@ -1,5 +1,5 @@
 // *****************************************************************************
-// Copyright 2013-2018 Aerospike, Inc.
+// Copyright 2013-2019 Aerospike, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License")
 // you may not use this file except in compliance with the License.
@@ -29,13 +29,13 @@ describe('Command', function () {
     }
 
     it('creates subclasses with informative constructor names', function () {
-      let cmd = new TestCommand({})
+      const cmd = new TestCommand({})
       expect(cmd.constructor.name).to.equal('TestCommand')
     })
 
     it('keeps a reference to the client instance', function () {
-      let client = {}
-      let cmd = new TestCommand(client)
+      const client = {}
+      const cmd = new TestCommand(client)
       expect(cmd.client).to.equal(client)
     })
   })

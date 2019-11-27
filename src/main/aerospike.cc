@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright 2013-2018 Aerospike, Inc.
+ * Copyright 2013-2019 Aerospike, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,7 +28,7 @@ extern "C" {
 #include <aerospike/as_async_proto.h>
 }
 
-#define export(__name, __value) exports->Set(Nan::New(__name).ToLocalChecked(), __value)
+#define export(__name, __value) Nan::Set(target, Nan::New(__name).ToLocalChecked(), __value)
 
 using namespace v8;
 
@@ -99,16 +99,20 @@ NAN_METHOD(client)
 /**
  *  aerospike object.
  */
-void Aerospike(Handle<Object> exports, Handle<Object> module)
+NAN_MODULE_INIT(Aerospike)
 {
+	Nan::HandleScope scope;
+
 	AerospikeClient::Init();
-	export("client", Nan::New<FunctionTemplate>(client)->GetFunction());
-	export("get_cluster_count", Nan::New<FunctionTemplate>(get_cluster_count)->GetFunction());
-	export("register_as_event_loop", Nan::New<FunctionTemplate>(register_as_event_loop)->GetFunction());
-	export("release_as_event_loop", Nan::New<FunctionTemplate>(release_as_event_loop)->GetFunction());
-	export("setDefaultLogging", Nan::New<FunctionTemplate>(setDefaultLogging)->GetFunction());
+
+	NAN_EXPORT(target, client);
+	NAN_EXPORT(target, get_cluster_count);
+	NAN_EXPORT(target, register_as_event_loop);
+	NAN_EXPORT(target, release_as_event_loop);
+	NAN_EXPORT(target, setDefaultLogging);
 
 	// enumerations
+	export("bitwise", bitwise_enum_values());
 	export("indexDataType", indexDataType());
 	export("indexType", indexType());
 	export("jobStatus", jobStatus());
@@ -120,10 +124,11 @@ void Aerospike(Handle<Object> exports, Handle<Object> module)
 	export("scanPriority", scanPriority());
 	export("log", log_enum_values());
 	export("operations", opcode_values());
+	export("bitOperations", bit_opcode_values());
 	export("policy", policy());
 	export("status", status());
 	export("ttl", ttl_enum_values());
 	export("auth", auth_mode_enum_values());
 }
 
-NODE_MODULE(aerospike, Aerospike)
+NODE_MODULE(aerospike, Aerospike);

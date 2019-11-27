@@ -11,9 +11,9 @@
 
 An Aerospike add-on module for Node.js.
 
-This module is compatible with Node.js v4.x, v6.x (LTS), v8.x (LTS) and
-v10.x (LTS). It supports the following operating systems: CentOS/RHEL 6/7, Debian
-7/8/9, Ubuntu 14.04/16.04/18.04, as well as many Linux destributions compatible
+This module is compatible with Node.js v8.x (LTS), v10.x (LTS), and v12.x
+(LTS). It supports the following operating systems: CentOS/RHEL 6/7, Debian
+8/9/10, Ubuntu 14.04/16.04/18.04, as well as many Linux destributions compatible
 with one of these OS releases. macOS and Windows are also supported.
 
 - [Usage](#Usage)
@@ -94,11 +94,6 @@ Aerospike.connect(config)
   })
 ```
 
-More examples illustrating the use of the API are located in the
-[`examples`](examples) directory.
-
-Details about the API are available in the [`docs`](docs) directory.
-
 <a name="Prerequisites"></a>
 ## Prerequisites
 
@@ -133,7 +128,7 @@ sudo yum install gcc-c++ openssl-devel zlib-devel
 ```
 
 Note: The `gcc` tool chain included in CentOS/RHEL 6.x is gcc-4.4. Building the
-Aerospike add-on using Node.js v4 or later, requires gcc-4.8 or later. To
+Aerospike add-on using Node.js v6 or later, requires gcc-4.8 or later. To
 update the gcc tool chain, you can install a recent version of the
 [Red Hat Developer Toolset](https://access.redhat.com/documentation/en/red-hat-developer-toolset/)
 or a compatible devtoolset version for CentOS.
@@ -340,7 +335,8 @@ The API docs also contain a few basic tutorials:
 A variety of additional example applications are provided in the
 [`examples`](examples) directory of this repository.
 
-The list of [backward incompatible API changes](docs/api-changes.md) by release.
+Backward incompatible API changes by release are documented at
+https://www.aerospike.com/docs/client/nodejs/usage/incompatible.html.
 
 ### API Versioning
 

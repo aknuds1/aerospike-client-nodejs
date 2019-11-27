@@ -1,5 +1,5 @@
 // *****************************************************************************
-// Copyright 2013-2018 Aerospike, Inc.
+// Copyright 2013-2019 Aerospike, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License")
 // you may not use this file except in compliance with the License.
@@ -23,12 +23,13 @@ const helper = require('./test_helper')
 
 describe('Command Queue #slow', function () {
   it('queues commands it cannot process immediately', function () {
-    let test = function (Aerospike, config, done) {
+    const test = function (Aerospike, config, done) {
+      config = Object.assign(config, { log: { level: Aerospike.log.OFF } })
       Aerospike.setupGlobalCommandQueue({ maxCommandsInProcess: 5, maxCommandsInQueue: 5 })
       Aerospike.connect(config)
         .then(client => {
-          let cmds = Array.from({ length: 10 }, (_, i) =>
-            client.put(new Aerospike.Key('test', 'test', i), {i: i}))
+          const cmds = Array.from({ length: 10 }, (_, i) =>
+            client.put(new Aerospike.Key('test', 'test', i), { i: i }))
           Promise.all(cmds)
             .then(results => done(results.length))
             .then(() => client.close())
@@ -39,13 +40,13 @@ describe('Command Queue #slow', function () {
   })
 
   it('rejects commands it cannot queue', function () {
-    let test = function (Aerospike, config, done) {
+    const test = function (Aerospike, config, done) {
       config = Object.assign(config, { log: { level: Aerospike.log.OFF } }) // disable logging for this test to suppress C client error messages
       Aerospike.setupGlobalCommandQueue({ maxCommandsInProcess: 5, maxCommandsInQueue: 1 })
       Aerospike.connect(config)
         .then(client => {
-          let cmds = Array.from({ length: 10 }, (_, i) =>
-            client.put(new Aerospike.Key('test', 'test', i), {i: i}))
+          const cmds = Array.from({ length: 10 }, (_, i) =>
+            client.put(new Aerospike.Key('test', 'test', i), { i: i }))
           Promise.all(cmds)
             .then(() => done('All commands processed successfully'))
             .catch(error => done(error.message))
@@ -57,7 +58,8 @@ describe('Command Queue #slow', function () {
   })
 
   it('throws an error when trying to configure command queue after client connect', function () {
-    let test = function (Aerospike, config, done) {
+    const test = function (Aerospike, config, done) {
+      config = Object.assign(config, { log: { level: Aerospike.log.OFF } })
       Aerospike.connect(config)
         .then(client => {
           try {

@@ -4,6 +4,65 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [3.13.0] - 2019-09-30
+
+* **New Features**
+  * Support for bitwise operations. Requires server version 4.6 or later. [#312](https://github.com/aerospike/aerospike-client-nodejs/pull/312)
+
+## [3.12.0] - 2019-08-31
+
+* **New Features**
+  * Support for operations on nested lists & maps. Requires server version 4.6 or later. [#307](https://github.com/aerospike/aerospike-client-nodejs/pull/307)
+
+* **Updates**
+  * Update C client library to [v4.6.7](http://www.aerospike.com/download/client/c/notes.html#4.6.7).
+  * Support Debian 10. Drop support for Debian 7.
+  * Fix tests for certain out-of-bounds list operations due to changed error code sent by server v4.6.
+  * Update dev dependecies: standard v14, yargs v14, nyc
+
+## [3.11.0] - 2019-05-22
+
+* **New Features**
+  * TLS support - Linux only, macOS & Windows not supported for now. [#298](https://github.com/aerospike/aerospike-client-nodejs/pull/298)
+  * Add new infoNode & getNodes functions. [#196](https://github.com/aerospike/aerospike-client-nodejs/pull/196)
+  * Support for Node.js 12 [#295](https://github.com/aerospike/aerospike-client-nodejs/pull/295)
+
+* **Updates**
+  * Update C client library to [v4.6.3](http://www.aerospike.com/download/client/c/notes.html#4.6.3). [#297](https://github.com/aerospike/aerospike-client-nodejs/pull/297)
+
+## [3.10.0] - 2019-04-08
+
+* **New Features**
+  * Support new relaxed read modes for SC namespaces. (via C client v4.6)
+  * Use stack based connection pools for more aggressive trimming of idle connections. (via C client v4.6)
+
+* **Updates**
+  * *BREAKING*: Read consistency level changes - see [Incompatible API Changes](https://www.aerospike.com/docs/client/nodejs/usage/incompatible.html#version-3-10-0) for details.
+  * Update C client library to [v4.6.1](http://www.aerospike.com/download/client/c/notes.html#4.6.1).
+  * Update nan to [v2.13.2](https://github.com/nodejs/nan/blob/master/CHANGELOG.md).
+  * Update mocha, codecov & other dev dependencies to latest version.
+
+## [3.9.0] - 2019-02-20
+
+* **Updates**
+  * Update C client library to [v4.5.0](http://www.aerospike.com/download/client/c/notes.html#4.5.0).
+  * Update nan to [v2.12.1](https://github.com/nodejs/nan/blob/master/CHANGELOG.md).
+  * Update nyc to v13.3 to address multiple potential vulnerabilities in nyc dependencies.
+  * Update docs for udfRemove function to document changes in server behavior when trying to delete a UDF module that does not exist.
+  * Drop Node.js v4 from the test matrix. The client still runs on Node.js v4 for now, but not all of its dev dependencies do.
+
+## [3.8.0] - 2018-12-14
+
+* **New Features**
+  * Add support for rack-aware clients.
+  * Add client run-time stats.
+
+* **Updates**
+  * Update C client library to [v4.4.0](http://www.aerospike.com/download/client/c/notes.html#4.4.0).
+  * Remove unused error codes.
+  * Improve global command queue docs.
+  * Shared memory layout has changed. The default Config#sharedMemory.key has changed to 0xA8000000 so old client applications do not mix shared memory with new client applications. If you are using shared memory clients with a custom shared memory key, it's critical that you change the key when upgrading to this version.
+
 ## [3.7.2] - 2018-11-09
 
 * **Bug Fixes**

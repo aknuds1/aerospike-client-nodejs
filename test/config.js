@@ -1,5 +1,5 @@
 // *****************************************************************************
-// Copyright 2013-2018 Aerospike, Inc.
+// Copyright 2013-2019 Aerospike, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License")
 // you may not use this file except in compliance with the License.
@@ -38,9 +38,9 @@ describe('Config #noserver', function () {
 
   describe('new Config', function () {
     it('copies config values from the passed Object', function () {
-      let settings = {
+      const settings = {
         clusterName: 'testCluster',
-        hosts: [ { addr: 'localhost', port: 3000 } ],
+        hosts: [{ addr: 'localhost', port: 3000 }],
         log: { level: 1, file: 2 },
         policies: {
           apply: new Aerospike.ApplyPolicy({ totalTimeout: 1000 }),
@@ -61,10 +61,13 @@ describe('Config #noserver', function () {
         authMode: Aerospike.auth.EXTERNAL_INSECURE,
         sharedMemory: { key: 1234 },
         modlua: { userPath: '/user/path' },
-        port: 3333
+        tls: { enable: true, encryptOnly: true },
+        port: 3333,
+        rackAware: true,
+        rackId: 42
       }
 
-      let config = new Config(settings)
+      const config = new Config(settings)
       expect(config).to.have.property('clusterName')
       expect(config).to.have.property('hosts')
       expect(config).to.have.property('log')
@@ -76,10 +79,13 @@ describe('Config #noserver', function () {
       expect(config).to.have.property('authMode')
       expect(config).to.have.property('sharedMemory')
       expect(config).to.have.property('modlua')
+      expect(config).to.have.property('tls')
       expect(config).to.have.property('port')
       expect(config).to.have.property('policies')
+      expect(config).to.have.property('rackAware')
+      expect(config).to.have.property('rackId')
 
-      let policies = config.policies
+      const policies = config.policies
       expect(policies.apply).to.be.instanceof(Aerospike.ApplyPolicy)
       expect(policies.batch).to.be.instanceof(Aerospike.BatchPolicy)
       expect(policies.info).to.be.instanceof(Aerospike.InfoPolicy)
@@ -92,7 +98,7 @@ describe('Config #noserver', function () {
     })
 
     it('initializes default policies', function () {
-      let settings = {
+      const settings = {
         policies: {
           apply: { totalTimeout: 1000 },
           batch: { totalTimeout: 1000 },
@@ -105,7 +111,7 @@ describe('Config #noserver', function () {
           write: { totalTimeout: 1000 }
         }
       }
-      let config = new Config(settings)
+      const config = new Config(settings)
 
       expect(config.policies.apply).to.be.instanceof(Aerospike.ApplyPolicy)
       expect(config.policies.batch).to.be.instanceof(Aerospike.BatchPolicy)
@@ -124,9 +130,10 @@ describe('Config #noserver', function () {
         policies: 1000,
         connTimeoutMs: 1.5,
         tenderInterval: '1000',
-        user: {name: 'admin'},
+        user: { name: 'admin' },
         password: 12345,
-        sharedMemory: true
+        sharedMemory: true,
+        rackId: 'myRack'
       }
       var config = new Config(obj)
       expect(config).to.not.have.property('log')
@@ -135,11 +142,12 @@ describe('Config #noserver', function () {
       expect(config).to.not.have.property('user')
       expect(config).to.not.have.property('password')
       expect(config).to.not.have.property('sharedMemory')
+      expect(config).to.not.have.property('rackId')
       expect(config.policies).to.be.empty()
     })
 
     it('throws a TypeError if invalid policy values are passed', function () {
-      let settings = {
+      const settings = {
         policies: {
           totalTimeout: 1000
         }
